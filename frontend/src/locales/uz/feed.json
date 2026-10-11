@@ -1,0 +1,20 @@
+{
+  "commentAria": "«{title}»ga izoh qoldirish",
+  "copyLinkAria": "Havolani nusxalash",
+  "loadError": "Lentani yuklab boʻlmadi",
+  "noMatch": "Bu soʻrovga mos narsa topilmadi",
+  "noMatchFilterBody": "Bu filtr boʻyicha hali maqolalar yoʻq.",
+  "noMatchHint": "Boshqa soʻz bilan qidiring yoki qidiruvni tozalang.",
+  "noMatchQueryBody": "Hech bir maqolada «{query}» soʻzi yoʻq. Kengroq soʻz bilan qidiring — qidiruv har bir maqolaning toʻliq matnini qamrab oladi.",
+  "readArticle": "Maqolani oʻqish",
+  "searchAria": "Lentangizdan qidirish",
+  "searchHint": "Faqat sarlavha emas, har bir maqolaning toʻliq matnidan qidiradi.",
+  "searchPlaceholder": "Maqolalar va ularning matnidan qidirish",
+  "subtitle": "Tibbiyot yangiliklari, oʻqish texnikasi va tadbirlar — har bir soʻz boʻyicha qidirish mumkin",
+  "tagAll": "Barchasi",
+  "tagMedicalNews": "Tibbiyot yangiliklari",
+  "tagSponsored": "Reklama",
+  "tagStudyTip": "Oʻqish maslahati",
+  "tagUpcomingEvent": "Yaqinlashayotgan tadbir",
+  "title": "Sizning lentangiz"
+}

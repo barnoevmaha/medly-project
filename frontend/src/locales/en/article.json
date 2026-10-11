@@ -1,0 +1,19 @@
+{
+  "backToFeed": "Back to your feed",
+  "commentDeleteError": "Could not delete that comment",
+  "commentDeleted": "Comment deleted",
+  "commentHint": "Posted under your name and visible to other students.",
+  "commentPlaceholder": "Add to the discussion…",
+  "commentPostError": "Could not post that comment",
+  "commentPosted": "Comment posted",
+  "comments": "Comments",
+  "deleteCommentAria": "Delete comment",
+  "loadError": "Could not load this article",
+  "loading": "Loading article…",
+  "minRead": "{n} min read",
+  "noComments": "No comments yet. Be the first to add one.",
+  "postComment": "Post comment",
+  "registerError": "Could not register that",
+  "share": "Share",
+  "writeCommentAria": "Write a comment"
+}

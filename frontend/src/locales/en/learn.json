@@ -1,0 +1,10 @@
+{
+  "loadError": "Could not load courses",
+  "noCourses": "No courses published yet",
+  "noCoursesBody": "The curriculum is seeded on first boot. Run the seed if this is a fresh database.",
+  "resume": "Continue where you left off",
+  "review": "Review",
+  "start": "Start",
+  "subtitle": "How medical AI works, where it fails, and how to use it responsibly",
+  "title": "AI Training"
+}

@@ -1,0 +1,10 @@
+{
+  "loadError": "Kurslarni yuklab boʻlmadi",
+  "noCourses": "Hozircha kurslar chop etilmagan",
+  "noCoursesBody": "Oʻquv dasturi birinchi ishga tushirishda yuklanadi. Agar bazangiz yangi boʻlsa, toʻldirishni ishga tushiring.",
+  "resume": "Toʻxtagan joyingizdan davom eting",
+  "review": "Takrorlash",
+  "start": "Boshlash",
+  "subtitle": "Tibbiy AI qanday ishlaydi, qayerda xato qiladi va undan qanday masʼuliyat bilan foydalanish kerak",
+  "title": "AI boʻyicha oʻqish"
+}

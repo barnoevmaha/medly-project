@@ -1,0 +1,20 @@
+{
+  "commentAria": "Comment on {title}",
+  "copyLinkAria": "Copy link",
+  "loadError": "Could not load the feed",
+  "noMatch": "Nothing matches that search",
+  "noMatchFilterBody": "No articles under this filter yet.",
+  "noMatchHint": "Try a different search term, or clear the search.",
+  "noMatchQueryBody": "No article mentions “{query}”. Try a broader term — the search covers the full text of every article.",
+  "readArticle": "Read article",
+  "searchAria": "Search your feed",
+  "searchHint": "Searches the full text of every article, not just the headline.",
+  "searchPlaceholder": "Search articles and their content",
+  "subtitle": "Medical news, study technique and events — searchable to the last word",
+  "tagAll": "All",
+  "tagMedicalNews": "Medical News",
+  "tagSponsored": "Sponsored",
+  "tagStudyTip": "Study Tip",
+  "tagUpcomingEvent": "Upcoming Event",
+  "title": "Your Feed"
+}

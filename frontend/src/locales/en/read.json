@@ -1,0 +1,8 @@
+{
+  "blockedHint": "If the reader does not load, your browser is blocking the embedded document — use",
+  "loadError": "Could not load this book",
+  "notFoundBody": "That title is not in the library.",
+  "notFoundTitle": "Book not found",
+  "openNewTab": "Open in new tab",
+  "opening": "Opening book…"
+}

@@ -1,0 +1,14 @@
+{
+  "backToCommunities": "Communities",
+  "joinCommunity": "Join community",
+  "leaveCommunity": "Leave community",
+  "loadError": "Could not open this community",
+  "messageAria": "Message",
+  "messagePlaceholder": "Message {name}…",
+  "noMessages": "No messages yet",
+  "opening": "Opening community…",
+  "send": "Send",
+  "sendError": "Message not sent",
+  "sendingJoins": "Sending a message joins this community.",
+  "startConversation": "Start the conversation — ask a question or share a case."
+}

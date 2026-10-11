@@ -1,0 +1,50 @@
+# One command to run the whole thing:  docker compose up --build
+# API on :8000, web on :5173.
+
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      # A local stack: dev allows this public signing key, creates the demo
+      # accounts and enables the demo checkout. Without it the API refuses to
+      # start. Never copy these two lines into a real deployment.
+      MEDLY_ENV: dev
+      MEDLY_SECRET_KEY: dev-only-insecure-secret-change-me
+      MEDLY_DATABASE_URL: sqlite:////app/data/medly.db
+      MEDLY_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      MEDLY_SEED_ON_STARTUP: "true"
+      MEDLY_ASSISTANT_PROVIDER: rules
+      # Passed through from your shell, never written here — a real key in a
+      # committed file is the one mistake this project cannot take back.
+      # Unset is fine: stock lookups are skipped and articles keep their
+      # authored covers. The image is built from ./backend, so backend/.env is
+      # not inside the build context at runtime; this is how the container
+      # gets the key.
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      PEXELS_TIMEOUT_SECONDS: ${PEXELS_TIMEOUT_SECONDS:-10}
+    volumes:
+      # Without this the SQLite file dies with the container and every restart
+      # begins from an empty database.
+      - medly-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  web:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    environment:
+      PORT: "80"
+      MEDLY_API_URL: http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  medly-data:

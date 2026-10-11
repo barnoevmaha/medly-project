@@ -1,0 +1,62 @@
+# backend/ and frontend/ are ALSO separate git repositories with their own
+# remotes (medly-backend, medly-frontend), which is what Railway and Vercel
+# deploy from. This repository carries the full source as well, so one link
+# shows the whole project.
+#
+# Because those nested .git directories exist, `git add` will not descend into
+# them — it stages a bare commit pointer instead. `tools/sync-monorepo.sh`
+# renames them aside for the duration of the add, which is the only reason the
+# files below are tracked here at all. Re-run it to refresh this snapshot.
+
+# The parked nested .git directories. Renaming a .git makes it an ordinary
+# directory, and `git add -A` would otherwise commit ~1500 files of git
+# internals along with the source.
+.git-nested-hidden/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- database ---
+# SQLite is the dev store. Never commit one — it contains hashed credentials
+# and would let a stale schema silently override a fresh migration.
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# --- Node / frontend ---
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.vercel/
+*.local
+# Written by `tsc -b`, which runs as part of `npm run build`.
+*.tsbuildinfo
+
+# --- secrets ---
+.env
+.env.*
+!.env.example
+
+# --- editors and OS ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.swp
+
+# --- logs ---
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*

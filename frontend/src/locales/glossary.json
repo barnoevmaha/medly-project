@@ -1,0 +1,193 @@
+{
+  "$comment": [
+    "Terminology the translator must use, so the same English word does not",
+    "become three different Uzbek words across three screens. Consulted by",
+    "scripts/i18n-translate.mjs and enforced by scripts/i18n-validate.mjs.",
+    "",
+    "Product names stay in English ('Medly'), and so do clinical",
+    "abbreviations written identically in all three languages, and 'Email',",
+    "which both target locales already leave as-is.",
+    "",
+    "'AI' and 'Premium' ARE translated — ИИ and Премиум in Russian — so they",
+    "live in `terms` with their required rendering rather than being listed",
+    "here as protected. Listing a word that should be translated is how you",
+    "end up with 'Премиум' flagged as an error."
+  ],
+  "doNotTranslate": [
+    "Medly",
+    "Medly AI",
+    "Email",
+    "CURB-65",
+    "SpO₂",
+    "GCS",
+    "ECG",
+    "MRI",
+    "CT"
+  ],
+  "terms": {
+    "Dashboard": {
+      "ru": "Панель управления",
+      "uz": "Boshqaruv paneli"
+    },
+    "Library": {
+      "ru": "Библиотека",
+      "uz": "Kutubxona"
+    },
+    "Community": {
+      "ru": "Сообщество",
+      "uz": "Hamjamiyat"
+    },
+    "Communities": {
+      "ru": "Сообщества",
+      "uz": "Hamjamiyatlar"
+    },
+    "Challenge": {
+      "ru": "Испытание",
+      "uz": "Sinov"
+    },
+    "Challenges": {
+      "ru": "Испытания",
+      "uz": "Sinovlar"
+    },
+    "Leaderboard": {
+      "ru": "Рейтинг",
+      "uz": "Reyting"
+    },
+    "Settings": {
+      "ru": "Настройки",
+      "uz": "Sozlamalar"
+    },
+    "Profile": {
+      "ru": "Профиль",
+      "uz": "Profil"
+    },
+    "Saved": {
+      "ru": "Сохранённые",
+      "uz": "Saqlangan"
+    },
+    "Streak": {
+      "ru": "Серия",
+      "uz": "Seriya"
+    },
+    "Badge": {
+      "ru": "Значок",
+      "uz": "Nishon"
+    },
+    "Points": {
+      "ru": "Очки",
+      "uz": "Ballar"
+    },
+    "Score": {
+      "ru": "Результат",
+      "uz": "Natija"
+    },
+    "Virtual Patient": {
+      "ru": "Виртуальный пациент",
+      "uz": "Virtual bemor"
+    },
+    "Case": {
+      "ru": "Клинический случай",
+      "uz": "Klinik holat"
+    },
+    "Patient": {
+      "ru": "Пациент",
+      "uz": "Bemor"
+    },
+    "Vitals": {
+      "ru": "Жизненные показатели",
+      "uz": "Hayotiy ko‘rsatkichlar"
+    },
+    "Stable": {
+      "ru": "Стабильное",
+      "uz": "Barqaror"
+    },
+    "Improving": {
+      "ru": "Улучшается",
+      "uz": "Yaxshilanmoqda"
+    },
+    "Deteriorating": {
+      "ru": "Ухудшается",
+      "uz": "Yomonlashmoqda"
+    },
+    "Critical": {
+      "ru": "Критическое",
+      "uz": "Og‘ir"
+    },
+    "Recovered": {
+      "ru": "Выздоровел",
+      "uz": "Sog‘aydi"
+    },
+    "Debrief": {
+      "ru": "Разбор случая",
+      "uz": "Holat tahlili"
+    },
+    "Decision": {
+      "ru": "Решение",
+      "uz": "Qaror"
+    },
+    "Diagnosis": {
+      "ru": "Диагноз",
+      "uz": "Tashxis"
+    },
+    "Treatment": {
+      "ru": "Лечение",
+      "uz": "Davolash"
+    },
+    "Symptom": {
+      "ru": "Симптом",
+      "uz": "Alomat"
+    },
+    "Clinical reasoning": {
+      "ru": "Клиническое мышление",
+      "uz": "Klinik fikrlash"
+    },
+    "Patient safety": {
+      "ru": "Безопасность пациента",
+      "uz": "Bemor xavfsizligi"
+    },
+    "Sign in": {
+      "ru": "Войти",
+      "uz": "Kirish"
+    },
+    "Log out": {
+      "ru": "Выйти",
+      "uz": "Chiqish"
+    },
+    "Save": {
+      "ru": "Сохранить",
+      "uz": "Saqlash"
+    },
+    "Cancel": {
+      "ru": "Отмена",
+      "uz": "Bekor qilish"
+    },
+    "Delete": {
+      "ru": "Удалить",
+      "uz": "O‘chirish"
+    },
+    "Retry": {
+      "ru": "Повторить",
+      "uz": "Qayta urinish"
+    },
+    "Continue": {
+      "ru": "Продолжить",
+      "uz": "Davom etish"
+    },
+    "Loading": {
+      "ru": "Загрузка",
+      "uz": "Yuklanmoqda"
+    },
+    "AI": {
+      "ru": "ИИ",
+      "uz": "AI"
+    },
+    "Premium": {
+      "ru": "Премиум",
+      "uz": "Premium"
+    }
+  },
+  "tone": {
+    "ru": "Address the user with the formal «вы», lowercase. Prefer short verb phrases on buttons («Сохранить», not «Сохранить изменения») unless the English is equally long. Avoid calquing English word order.",
+    "uz": "Use the Latin alphabet with the correct apostrophes (o‘, g‘). Address the user with the polite «siz» form. Prefer everyday Uzbek over Russian loanwords where a natural Uzbek term exists."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "backToCommunities": "Hamjamiyatlar",
+  "joinCommunity": "Hamjamiyatga qoʻshilish",
+  "leaveCommunity": "Hamjamiyatni tark etish",
+  "loadError": "Bu hamjamiyatni ochib boʻlmadi",
+  "messageAria": "Xabar",
+  "messagePlaceholder": "{name} ga xabar…",
+  "noMessages": "Hali xabar yoʻq",
+  "opening": "Hamjamiyat ochilmoqda…",
+  "send": "Yuborish",
+  "sendError": "Xabar yuborilmadi",
+  "sendingJoins": "Xabar yuborsangiz, avtomatik ravishda hamjamiyatga qoʻshilasiz.",
+  "startConversation": "Suhbatni boshlang — savol bering yoki holat ulashing."
+}

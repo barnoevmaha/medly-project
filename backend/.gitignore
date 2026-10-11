@@ -1,0 +1,28 @@
+# Secrets. GEMINI_API_KEY lives here — it must never reach the repository.
+.env
+.env.*
+!.env.example
+
+# Local database and uploads
+*.db
+*.db-journal
+# Anchored to the repo root on purpose: an unanchored `data/` also matched
+# app/data/, which is authored content (the Virtual Patient scenarios), not a
+# runtime volume — they were silently untracked.
+/data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

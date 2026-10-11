@@ -1,0 +1,19 @@
+{
+  "backToFeed": "Lentangizga qaytish",
+  "commentDeleteError": "Izohni oʻchirib boʻlmadi",
+  "commentDeleted": "Izoh oʻchirildi",
+  "commentHint": "Ismingiz ostida joylanadi va boshqa talabalarga koʻrinadi.",
+  "commentPlaceholder": "Muhokamaga qoʻshiling…",
+  "commentPostError": "Izohni joylab boʻlmadi",
+  "commentPosted": "Izoh joylandi",
+  "comments": "Izohlar",
+  "deleteCommentAria": "Izohni oʻchirish",
+  "loadError": "Maqolani yuklab boʻlmadi",
+  "loading": "Maqola yuklanmoqda…",
+  "minRead": "{n} daqiqalik oʻqish",
+  "noComments": "Hali izohlar yoʻq. Birinchi boʻling.",
+  "postComment": "Izohni joylash",
+  "registerError": "Buni qayd qilib boʻlmadi",
+  "share": "Ulashish",
+  "writeCommentAria": "Izoh yozish"
+}

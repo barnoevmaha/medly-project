@@ -1,0 +1,282 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------
+   Fonts — self-hosted, no external requests.
+   --------------------------------------------------------------- */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300; font-display: swap; src: url("/fonts/Inter-300.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Inter-400.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Inter-500.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Inter-600.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Inter-700.woff2") format("woff2"); }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/PlusJakartaSans-500.woff2") format("woff2"); }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/PlusJakartaSans-600.woff2") format("woff2"); }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/PlusJakartaSans-700.woff2") format("woff2"); }
+
+/* ---------------------------------------------------------------
+   THEME — this is the only place you need to touch to re-brand.
+   Values are HSL triplets: "hue saturation% lightness%".
+   --------------------------------------------------------------- */
+@layer base {
+  :root {
+    --background: 195 30% 98%;
+    --foreground: 200 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 200 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 25% 15%;
+
+    --primary: 174 72% 40%;            /* teal */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 195 25% 94%;
+    --secondary-foreground: 200 25% 25%;
+    --muted: 195 20% 96%;
+    --muted-foreground: 200 15% 45%;
+    --accent: 12 85% 62%;              /* coral */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 158 64% 42%;
+    --warning: 38 92% 50%;
+    --info: 199 89% 48%;
+
+    --border: 195 20% 90%;
+    --input: 195 20% 90%;
+    --ring: 174 72% 40%;
+    --radius: 0.75rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(174 72% 40%), hsl(187 70% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(12 85% 62%), hsl(25 90% 58%));
+    --gradient-hero: linear-gradient(180deg, hsl(195 30% 98%) 0%, hsl(187 40% 95%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(195 25% 98%) 100%);
+
+    --shadow-soft: 0 4px 20px -4px hsl(200 25% 15% / 0.08);
+    --shadow-medium: 0 8px 30px -6px hsl(200 25% 15% / 0.12);
+    --shadow-glow: 0 0 40px -10px hsl(174 72% 40% / 0.3);
+  }
+
+  /* Dark theme — the same variables, different values. Every component reads
+     these, so nothing else in the app needs to know a theme exists. Toggled by
+     putting `.dark` on <html>; see src/lib/preferences.ts. */
+  .dark {
+    --background: 200 28% 10%;
+    --foreground: 195 20% 92%;
+
+    --card: 200 26% 13%;
+    --card-foreground: 195 20% 92%;
+    --popover: 200 26% 13%;
+    --popover-foreground: 195 20% 92%;
+
+    --primary: 174 62% 45%;
+    --primary-foreground: 200 30% 8%;
+    --secondary: 200 20% 20%;
+    --secondary-foreground: 195 18% 88%;
+    --muted: 200 20% 18%;
+    --muted-foreground: 200 12% 66%;
+    --accent: 12 80% 63%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 158 55% 50%;
+    --warning: 38 88% 58%;
+    --info: 199 80% 58%;
+
+    --border: 200 16% 23%;
+    --input: 200 16% 23%;
+    --ring: 174 62% 45%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(174 62% 42%), hsl(187 60% 46%));
+    --gradient-accent: linear-gradient(135deg, hsl(12 80% 58%), hsl(25 84% 55%));
+    --gradient-hero: linear-gradient(180deg, hsl(200 28% 10%) 0%, hsl(195 30% 14%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(200 26% 14%) 0%, hsl(200 24% 12%) 100%);
+
+    --shadow-soft: 0 4px 20px -4px hsl(200 40% 2% / 0.5);
+    --shadow-medium: 0 8px 30px -6px hsl(200 40% 2% / 0.6);
+    --shadow-glow: 0 0 40px -10px hsl(174 62% 45% / 0.35);
+  }
+
+  /* Honours the Appearance setting, and the OS-level preference for anyone who
+     never opens Settings. */
+  .reduce-motion *,
+  .reduce-motion *::before,
+  .reduce-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reduce-motion .card-hover:hover { transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* One visible focus style for everything reachable by keyboard. Applied via
+     :focus-visible so it appears for keyboard and assistive tech without
+     ringing every mouse click. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: calc(var(--radius) - 4px);
+  }
+
+  /* Skip link — first thing in the tab order, invisible until focused. */
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus-visible {
+    @apply not-sr-only fixed left-4 top-4 z-[200] rounded-xl bg-card px-4 py-2 text-sm font-semibold shadow-medium;
+  }
+
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    color-scheme: light;
+  }
+  .dark body { color-scheme: dark; }
+  h1, h2, h3 { @apply font-display; }
+}
+
+@layer components {
+  .gradient-primary { background: var(--gradient-primary); }
+  .gradient-accent  { background: var(--gradient-accent); }
+  .gradient-hero    { background: var(--gradient-hero); }
+  .gradient-card    { background: var(--gradient-card); }
+
+  .shadow-soft   { box-shadow: var(--shadow-soft); }
+  .shadow-medium { box-shadow: var(--shadow-medium); }
+  .shadow-glow   { box-shadow: var(--shadow-glow); }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1;
+    box-shadow: var(--shadow-soft);
+  }
+  .card-hover:hover { box-shadow: var(--shadow-medium); }
+
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+}
+
+/* Medly AI streaming cursor. A caret that blinks while Gemini is still
+   producing text and disappears when it stops — the only motion the
+   streaming answer adds. Honours the Reduce motion preference. */
+@keyframes medly-caret {
+  0%, 45% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+.stream-caret {
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: hsl(var(--primary));
+  border-radius: 1px;
+  animation: medly-caret 1s steps(1, end) infinite;
+}
+.reduce-motion .stream-caret { animation: none; opacity: 1; }
+
+/* Virtual Patient. Additions only — nothing above is modified. Every rule
+   below is disabled by the existing .reduce-motion preference, so a student
+   who has asked for stillness gets a static illustration. */
+
+/* The figure breathes. Rate comes from --vp-breath, which the avatar sets per
+   condition, so "working hard to breathe" is legible before you read a word. */
+@keyframes vp-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-1.5px) scale(1.012); }
+}
+.vp-breathe {
+  animation: vp-breathe var(--vp-breath, 4.4s) ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+/* A single pulse when the condition changes, rather than a permanent effect. */
+@keyframes vp-state-change {
+  0%   { filter: brightness(1); transform: scale(1); }
+  35%  { filter: brightness(1.06); transform: scale(1.035); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+.vp-state-change { animation: vp-state-change 0.9s ease-out; }
+
+/* New dialogue rises into place. */
+@keyframes vp-bubble {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vp-bubble { animation: vp-bubble 0.32s ease-out both; }
+
+/* Decision feedback: a brief settle for a good call, a brief shake for one
+   that hurt the patient. Both are short and neither is celebratory. */
+@keyframes vp-correct {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.012); }
+  100% { transform: scale(1); }
+}
+@keyframes vp-incorrect {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-3px); }
+  75%      { transform: translateX(3px); }
+}
+.vp-correct   { animation: vp-correct 0.45s ease-out; }
+.vp-incorrect { animation: vp-incorrect 0.32s ease-in-out; }
+
+.reduce-motion .vp-breathe,
+.reduce-motion .vp-state-change,
+.reduce-motion .vp-bubble,
+.reduce-motion .vp-correct,
+.reduce-motion .vp-incorrect { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vp-breathe, .vp-state-change, .vp-bubble,
+  .vp-correct, .vp-incorrect { animation: none; }
+}
+
+/* A vital that just moved holds a brief tint, so a change is noticed without
+   the student having memorised the previous screen. */
+@keyframes vp-vital-changed {
+  0%   { background-color: hsl(var(--primary) / 0.16); }
+  100% { background-color: transparent; }
+}
+.vp-vital-changed { animation: vp-vital-changed 2.2s ease-out; }
+.reduce-motion .vp-vital-changed { animation: none; }
+@media (prefers-reduced-motion: reduce) { .vp-vital-changed { animation: none; } }
+
+/* Skin tone, brow angle and mouth curve ease between conditions, so a patient
+   drifting from stable to critical looks like a drift and not a jump cut. */
+.vp-tint {
+  transition: fill 700ms ease, stroke 700ms ease, transform 700ms ease, d 700ms ease;
+}
+.reduce-motion .vp-tint { transition: none; }
+@media (prefers-reduced-motion: reduce) { .vp-tint { transition: none; } }
+
+/* Medly AI — the EVE launcher. Only the blink and the expression swap live
+   here; the eyes' cursor tracking is JavaScript and guards itself. The long,
+   mostly-idle cycle is deliberate: a launcher that blinks often reads as a
+   distraction rather than a character. */
+@keyframes eve-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94%, 96%      { transform: scaleY(0.1); }
+}
+.eve-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: eve-blink 7s ease-in-out infinite;
+}
+.reduce-motion .eve-eye { animation: none; }
+@media (prefers-reduced-motion: reduce) { .eve-eye { animation: none; } }

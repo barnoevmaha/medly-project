@@ -26,7 +26,7 @@ docker compose up --build
 
 API on <http://localhost:8000> (docs at `/docs`), web on <http://localhost:5173>.
 The database seeds itself on first boot, so you can sign straight in with
-`certified@medly.dev` / `medly1234`.
+`student@medly.dev` / `medly1234`.
 
 If this works locally, Railway will almost certainly work too — it is building
 the same two Dockerfiles. Debugging here is far faster than debugging in a
@@ -119,33 +119,35 @@ demo accounts. If it is missing, the seed did not run and nobody can sign in.
 
    | Variable | Value |
    |---|---|
-   | `MEDLY_API_URL` | the API domain, e.g. `https://medly-api.up.railway.app` |
+   | `MEDLY_API_UPSTREAM` | the API domain, e.g. `https://medly-api.up.railway.app` |
 
-   Include `https://`, and no trailing slash.
+   Include `https://`. The container refuses to start without it, and says so
+   in the deploy log.
 
-   This is read by the container entrypoint at start, not baked in at build
-   time, so changing it later needs a restart rather than a rebuild.
+   nginx in this service proxies `/api/` to that address, so the browser only
+   ever talks to the web domain. That matters: two `*.up.railway.app` domains
+   are different *sites* to a browser, and the API's refresh-token cookie
+   would be third-party — Safari and Brave block those, signing users out
+   every 15 minutes. Through the proxy the cookie is first-party everywhere.
+
+   Leave `MEDLY_API_URL` unset. It exists only to bypass the proxy.
 4. **Settings → Networking → Generate Domain.**
 
 ---
 
-## Step 3 — close the CORS loop
+## Step 3 — tighten the cookie (optional)
 
-Back on the **API** service, set:
+The browser reaches the API on the web domain, so CORS is not involved and
+`MEDLY_CORS_ORIGINS` needs no change. On the **API** service you can set
 
 ```
-MEDLY_CORS_ORIGINS = https://<your-web-domain>.up.railway.app
+MEDLY_REFRESH_COOKIE_SAMESITE = lax
 ```
 
-and redeploy it.
-
-This is required: the API admits exactly the origins in `MEDLY_CORS_ORIGINS`
-and matches no patterns, so the web app gets CORS errors until its domain is
-listed. Separate several with commas.
-
-The two services sit on different sites, so the refresh-token cookie is sent
-with `SameSite=None; Secure` — the default outside dev, and the reason both
-services must be served over HTTPS.
+The default outside dev is `none`, which is only needed when a frontend calls
+the API from another site (`MEDLY_API_URL` pointing elsewhere — then that
+frontend's origin must also be listed in `MEDLY_CORS_ORIGINS`). With the proxy,
+`lax` works and is stricter.
 
 ---
 
@@ -161,12 +163,14 @@ Open the web domain and walk the actual demo, not just the login page:
 5. Refresh the page while on `/imaging`. It should load, not 404 — nginx is
    configured to fall back to `index.html` for client-side routes.
 
-If login returns a network error, it is almost always CORS. The browser console
-names the blocked origin; it should match `MEDLY_CORS_ORIGINS` exactly, scheme
-included.
+If login returns a network error or a 502, the proxy cannot reach the API.
+The web service's deploy log prints `proxying /api/ to …` at start; that
+address should open `/api/health` in a browser.
 
-If login returns "Incorrect email or password", the seed did not run. Check
-`MEDLY_SEED_ON_STARTUP=true` and the deploy logs.
+If login returns "Incorrect email or password", the demo accounts do not exist.
+They are created only with `MEDLY_SEED_DEMO_USERS=true` (and
+`MEDLY_SEED_ON_STARTUP=true`) on the API service — check both and the deploy
+logs.
 
 ---
 

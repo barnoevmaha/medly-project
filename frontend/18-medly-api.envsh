@@ -1,0 +1,27 @@
+#!/bin/sh
+# Sourced (not run) by the nginx entrypoint before it renders the templates,
+# so the normalised value below is what lands in nginx.conf.
+#
+# MEDLY_API_UPSTREAM is where /api/ is proxied: the API's base URL, e.g.
+#   https://medly-api-production.up.railway.app    (Railway)
+#   http://api:8000                                 (docker compose)
+
+if [ -z "${MEDLY_API_UPSTREAM:-}" ]; then
+  echo "medly: MEDLY_API_UPSTREAM is not set — the web service cannot reach the API." >&2
+  echo "medly: set it to the API's URL, e.g. https://<api-service>.up.railway.app" >&2
+  exit 1
+fi
+
+case "$MEDLY_API_UPSTREAM" in
+  http://*|https://*) ;;
+  *)
+    echo "medly: MEDLY_API_UPSTREAM must start with http:// or https:// (got '$MEDLY_API_UPSTREAM')." >&2
+    exit 1
+    ;;
+esac
+
+# A trailing slash would make nginx replace the /api/ prefix instead of
+# passing the path through, so every request would 404.
+MEDLY_API_UPSTREAM="${MEDLY_API_UPSTREAM%/}"
+export MEDLY_API_UPSTREAM
+echo "medly: proxying /api/ to $MEDLY_API_UPSTREAM"

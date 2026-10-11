@@ -10,4 +10,4 @@ cat > /usr/share/nginx/html/config.js <<EOF
 window.__MEDLY_API_URL__ = "${MEDLY_API_URL}";
 EOF
 
-echo "medly: API URL set to '${MEDLY_API_URL:-(same origin fallback)}'"
+echo "medly: API URL set to '${MEDLY_API_URL:-(same origin, via the /api/ proxy)}'"

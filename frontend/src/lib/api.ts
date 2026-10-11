@@ -7,12 +7,15 @@ import { readLang } from "./i18n";
  *   1. window.__MEDLY_API_URL__ — written at container start, so one built
  *      image can point at any backend without a rebuild.
  *   2. VITE_API_URL — baked in at build time, for local `npm run dev`.
- *   3. localhost:8000 — the default the README tells you to run.
+ *   3. `npm run dev` with neither: localhost:8000, the README's default.
+ *   4. A production build with neither: this same origin, where nginx proxies
+ *      /api/ to the API (frontend/nginx.conf). This is the deployed setup —
+ *      it keeps the refresh cookie first-party.
  */
 const BASE =
   (typeof window !== "undefined" && window.__MEDLY_API_URL__) ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:8000";
+  (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 const TOKEN_KEY = "medly.token";
 

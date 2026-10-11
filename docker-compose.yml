@@ -41,7 +41,9 @@ services:
       - "5173:80"
     environment:
       PORT: "80"
-      MEDLY_API_URL: http://localhost:8000
+      # nginx proxies /api/ here, so the browser talks to one origin — the
+      # same setup as on Railway.
+      MEDLY_API_UPSTREAM: http://api:8000
     depends_on:
       api:
         condition: service_healthy

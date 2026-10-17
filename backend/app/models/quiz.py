@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from app.models._time import UTCDateTime, utcnow
@@ -67,3 +68,22 @@ class QuizAttempt(SQLModel, table=True):
     # JSON: {"question_id": [choice_id, ...]}
     answers_json: str = Field(default="{}")
     submitted_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class QuizReward(SQLModel, table=True):
+    """The points for passing a quiz — one row per (user, quiz), ever.
+
+    The unique pair is what makes "once" hold. Checking for an earlier passed
+    attempt and then paying is two steps, and two submissions arriving
+    together would both see "not yet" and both pay. Inserting this row is the
+    claim: exactly one insert can succeed.
+    """
+
+    __tablename__ = "quiz_rewards"
+    __table_args__ = (UniqueConstraint("user_id", "quiz_id", name="uq_quiz_rewards_user_quiz"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    quiz_id: int = Field(foreign_key="quizzes.id", index=True)
+    points: int = Field(default=0)
+    awarded_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)

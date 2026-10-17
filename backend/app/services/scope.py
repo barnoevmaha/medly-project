@@ -266,9 +266,8 @@ def classify(
     if not text:
         return ScopeVerdict(False, "empty")
 
-    for pattern in INJECTION_PATTERNS:
-        if pattern.search(text):
-            return ScopeVerdict(False, "instruction override attempt")
+    if is_override_attempt(text):
+        return ScopeVerdict(False, "instruction override attempt")
 
     hit = OFF_TOPIC.search(text)
     if hit:
@@ -288,6 +287,15 @@ def classify(
         return ScopeVerdict(True, "follow-up in an existing conversation")
 
     return ScopeVerdict(False, "no medical subject")
+
+
+def is_override_attempt(text: str) -> bool:
+    """True when `text` tries to replace the system instruction.
+
+    Used on the message itself (via `classify`) and on the client's
+    `context_note`, which reaches the prompt by a different road.
+    """
+    return any(pattern.search(text or "") for pattern in INJECTION_PATTERNS)
 
 
 def find_off_topic(message: str) -> Optional[str]:

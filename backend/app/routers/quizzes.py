@@ -7,18 +7,19 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.db import get_session
 from app.lang import get_lang
 from app.models.course import Course
 from app.models.enums import EventType, RiskLevel
-from app.models.quiz import Choice, Question, Quiz, QuizAttempt
+from app.models.quiz import Choice, Question, Quiz, QuizAttempt, QuizReward
 from app.models.user import User
 from app.security import get_current_user
 from app.services import localize
 from app.services.audit import log_event
-from app.services.gamification import sync_badges, touch_streak
+from app.services.gamification import award_points, sync_badges, touch_streak
 from app.services.scoring import competency_band, grade
 
 router = APIRouter(prefix="/api/quizzes", tags=["quizzes"])
@@ -186,6 +187,26 @@ def _quiz_out(session: Session, quiz: Quiz, lang: str = "en") -> QuizOut:
     )
 
 
+QUIZ_PASS_POINTS = 100
+
+
+def _claim_pass_reward(session: Session, user: User, quiz_id: int) -> int:
+    """Pay for a pass, once per quiz, and return what was paid.
+
+    The reward row is the claim (see QuizReward): if this user already holds
+    one for this quiz — from an earlier pass, or from a submission racing this
+    one — the insert fails and nothing is paid.
+    """
+    session.add(QuizReward(user_id=user.id or 0, quiz_id=quiz_id, points=QUIZ_PASS_POINTS))
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        return 0
+    award_points(session, user, QUIZ_PASS_POINTS)
+    return QUIZ_PASS_POINTS
+
+
 @router.post("/{quiz_id}/submit", response_model=SubmitResponse)
 def submit(
     quiz_id: int,
@@ -239,25 +260,10 @@ def submit(
         submitted_at=datetime.now(timezone.utc),
     )
     session.add(attempt)
-
-    # Points for a pass, once per quiz. `previously_passed` is checked before
-    # this attempt is committed, so resitting a quiz cannot be farmed.
-    previously_passed = session.exec(
-        select(QuizAttempt).where(
-            QuizAttempt.user_id == user.id,
-            QuizAttempt.quiz_id == quiz_id,
-            QuizAttempt.passed == True,  # noqa: E712
-        )
-    ).first()
-    quiz_points = 0
-    if passed and not previously_passed:
-        quiz_points = 100
-        user.points = (user.points or 0) + quiz_points
-
-    session.add(user)
     session.commit()
     session.refresh(attempt)
-    session.refresh(user)
+
+    quiz_points = _claim_pass_reward(session, user, quiz_id) if passed else 0
     touch_streak(session, user)
     sync_badges(session, user)
 

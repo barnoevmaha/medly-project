@@ -11,7 +11,7 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
@@ -130,8 +130,12 @@ def _record_refusal(
 
 def _page_context(
     session: Session, kind: Optional[str], key: Optional[str], note: Optional[str]
-) -> Optional[str]:
+) -> Tuple[Optional[str], bool]:
     """What the user is looking at, resolved from our own database.
+
+    Returns the context text and whether it is *grounded* — whether a real
+    article, resource or challenge was found. Only grounding counts towards
+    the topic boundary.
 
     The client sends a kind and a slug, never content. Whatever the model is
     told about an article or a challenge therefore comes from the same rows the
@@ -139,7 +143,11 @@ def _page_context(
     put words in the source material.
 
     `note` is the exception: on-screen state the server has no cheap way to
-    know, such as which question is showing. It is capped hard.
+    know, such as which question is showing. It is client text, so it gets the
+    same treatment as a message before it can reach the prompt — identifiers
+    redacted, an instruction-override attempt dropped — and it never counts as
+    grounding, or any request could carry an off-topic question past the scope
+    check by attaching `context_note: "x"`.
     """
     parts: List[str] = []
 
@@ -179,10 +187,39 @@ def _page_context(
                 f"Difficulty: {challenge.difficulty}\n\n{challenge.description}"
             )
 
-    if note:
-        parts.append(f"ON SCREEN NOW:\n{note[: settings.ai_note_context_chars]}")
+    grounded = bool(parts)
 
-    return "\n\n".join(parts) if parts else None
+    if note:
+        note = safety.redact(note[: settings.ai_note_context_chars])
+        if scope.is_override_attempt(note):
+            logger.warning("assistant dropped a context_note that tried to override instructions")
+        else:
+            parts.append(f"ON SCREEN NOW:\n{note}")
+
+    return ("\n\n".join(parts) if parts else None), grounded
+
+
+def _conversation_history(
+    session: Session, session_id: str, user_id: int, skip_content: str
+) -> List[dict]:
+    """The earlier turns of *this user's* conversation.
+
+    `session_id` comes from the client, so it is never enough on its own:
+    without the user filter, anyone who learned another student's session id
+    would have that student's messages fed to the model as their own history —
+    and could plant turns in it.
+    """
+    rows = session.exec(
+        select(AssistantMessage)
+        .where(
+            AssistantMessage.session_id == session_id,
+            AssistantMessage.user_id == user_id,
+            AssistantMessage.blocked == False,  # noqa: E712
+        )
+        .order_by(AssistantMessage.created_at.desc())  # type: ignore[union-attr]
+        .limit(HISTORY_TURNS * 2)
+    ).all()
+    return _trim_history(list(rows), skip_content)
 
 
 def _trim_history(rows: List[AssistantMessage], skip_content: str) -> List[dict]:
@@ -324,24 +361,18 @@ def chat(
         )
 
     # ---- answered ---------------------------------------------------------
-    history_rows = session.exec(
-        select(AssistantMessage)
-        .where(AssistantMessage.session_id == session_id, AssistantMessage.blocked == False)  # noqa: E712
-        .order_by(AssistantMessage.created_at.desc())  # type: ignore[union-attr]
-        .limit(HISTORY_TURNS * 2)
-    ).all()
-    history = _trim_history(list(history_rows), verdict.redacted_text)
+    history = _conversation_history(session, session_id, user.id or 0, verdict.redacted_text)
 
     ctx_kind = payload.context_kind or ("article" if payload.article_slug else None)
     ctx_key = payload.context_key or payload.article_slug
-    context = _page_context(session, ctx_kind, ctx_key, payload.context_note)
+    context, grounded = _page_context(session, ctx_kind, ctx_key, payload.context_note)
 
     # ---- topic boundary ---------------------------------------------------
     # Before the provider and before the rate window: an off-topic question
     # costs nothing and is answered from this process.
     in_scope = scope.classify(
         text,
-        has_page_context=bool(context),
+        has_page_context=grounded,
         has_history=bool(history),
         is_quick_action=bool(payload.action),
     )
@@ -692,24 +723,18 @@ def chat_stream(
             detail="Streaming is not available with the current assistant provider.",
         )
 
-    history_rows = session.exec(
-        select(AssistantMessage)
-        .where(AssistantMessage.session_id == session_id, AssistantMessage.blocked == False)  # noqa: E712
-        .order_by(AssistantMessage.created_at.desc())  # type: ignore[union-attr]
-        .limit(HISTORY_TURNS * 2)
-    ).all()
-    history = _trim_history(list(history_rows), verdict.redacted_text)
+    history = _conversation_history(session, session_id, user.id or 0, verdict.redacted_text)
 
     kind = payload.context_kind or ("article" if payload.article_slug else None)
     key = payload.context_key or payload.article_slug
-    context = _page_context(session, kind, key, payload.context_note)
+    context, grounded = _page_context(session, kind, key, payload.context_note)
 
     # ---- topic boundary ---------------------------------------------------
     # No Gemini stream is opened for an off-topic question. The refusal is a
     # complete, valid SSE exchange so the client needs no special case.
     in_scope = scope.classify(
         text,
-        has_page_context=bool(context),
+        has_page_context=grounded,
         has_history=bool(history),
         is_quick_action=bool(payload.action),
     )

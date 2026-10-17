@@ -24,7 +24,7 @@ from app.models.enums import (
     Role,
     SessionStatus,
 )
-from app.models.quiz import Choice, Question, Quiz, QuizAttempt
+from app.models.quiz import Choice, Question, Quiz, QuizAttempt, QuizReward
 from app.models.refresh_token import RefreshToken
 from app.models.social import (
     Article,
@@ -74,6 +74,7 @@ __all__ = [
     "Question",
     "Quiz",
     "QuizAttempt",
+    "QuizReward",
     "RefreshToken",
     "Resource",
     "RiskLevel",

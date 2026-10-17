@@ -14,6 +14,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select
 
 from app.db import get_session
@@ -357,6 +358,26 @@ def answer(
                 points_awarded=awarded,
             )
         )
+        try:
+            # Committed on its own, before anything is paid: the unique
+            # (user, question) index makes this insert the claim.
+            session.commit()
+        except IntegrityError:
+            # Another submission for the same question got there first —
+            # the race the existence check above cannot see. Replay its
+            # result, exactly as for a refresh, and pay nothing.
+            session.rollback()
+            existing = session.exec(
+                select(ChallengeAnswer).where(
+                    ChallengeAnswer.user_id == user.id,
+                    ChallengeAnswer.question_id == question.id,
+                )
+            ).one()
+            already = True
+            correct = existing.correct
+            awarded = 0
+
+    if not already:
         # Answering counts as joining, so a deep link cannot desync the two.
         participant = session.exec(
             select(ChallengeParticipant).where(
@@ -365,11 +386,10 @@ def answer(
             )
         ).first()
         if not participant:
-            participant = ChallengeParticipant(
-                challenge_id=challenge.id or 0, user_id=user.id or 0
+            session.add(
+                ChallengeParticipant(challenge_id=challenge.id or 0, user_id=user.id or 0)
             )
-            session.add(participant)
-        session.commit()
+            session.commit()
 
         gamification.touch_streak(session, user)
         if awarded:

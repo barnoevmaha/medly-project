@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 from app.models._time import UTCDateTime, utcnow
@@ -108,6 +109,15 @@ class ChallengeAnswer(SQLModel, table=True):
     """
 
     __tablename__ = "challenge_answers"
+    # One answer per user per question, enforced by the database. The router's
+    # "already answered?" read cannot do it alone: two submissions racing each
+    # other both read "no" and both score. Existing databases get this index
+    # from app/db.py (`_ensure_unique_indexes`).
+    __table_args__ = (
+        Index(
+            "ux_challenge_answers_user_question", "user_id", "question_id", unique=True
+        ),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)

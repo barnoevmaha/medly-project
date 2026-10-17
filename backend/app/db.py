@@ -138,6 +138,48 @@ def migrate_columns() -> None:
                 print(f"medly: could not drop {table_name}.{column_name}: {error}")
 
     _relax_challenge_answer_choice(tables)
+    _ensure_unique_indexes()
+
+
+def _ensure_unique_indexes() -> None:
+    """Create unique indexes a model declares but an existing table lacks.
+
+    `create_all` builds them for new tables only, and a unique index is what
+    turns "pay out once" from a hope into a rule (see ChallengeAnswer). Rows
+    that already break the rule — duplicates written by the race the index now
+    prevents — are removed first, keeping the earliest, or the index could not
+    be created at all.
+
+    Runs after the SQLite table rebuild above, which drops a table's indexes.
+    """
+    import app.models  # noqa: F401  (registers every SQLModel table)
+
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import text
+
+    inspector = sa_inspect(engine)
+    tables = set(inspector.get_table_names())
+    for table in SQLModel.metadata.sorted_tables:
+        if table.name not in tables:
+            continue
+        present = {index["name"] for index in inspector.get_indexes(table.name)}
+        for index in table.indexes:
+            if not index.unique or index.name in present:
+                continue
+            columns = ", ".join(column.name for column in index.columns)
+            with engine.begin() as connection:
+                # The doubled subquery is for MySQL, which refuses a DELETE
+                # whose subquery reads the same table directly.
+                removed = connection.execute(
+                    text(
+                        f"DELETE FROM {table.name} WHERE id NOT IN ("
+                        f"SELECT id FROM (SELECT MIN(id) AS id FROM {table.name} "
+                        f"GROUP BY {columns}) AS keep_rows)"
+                    )
+                ).rowcount
+                if removed:
+                    print(f"medly: removed {removed} duplicate row(s) from {table.name} ({columns})")
+                index.create(bind=connection)
 
 
 def _relax_challenge_answer_choice(tables: set) -> None:

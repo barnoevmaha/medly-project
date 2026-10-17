@@ -26,12 +26,25 @@ from app.models.enums import RiskLevel
 # --------------------------------------------------------------------------
 
 # Asking the tool to make the call on a real, present patient.
+#
+# Two things these must get right at once. They must catch a request to decide
+# something for a patient the asker is treating — in every language the app
+# speaks, or a Russian or Uzbek student is simply not covered. And they must
+# not catch the ordinary phrasing of teaching material: "the patient has a
+# fever" is how every textbook vignette is written, and "what dose of
+# adrenaline is used in anaphylaxis" is a pharmacology question. So the
+# triggers are possessive ("my patient") or first-person ("should I give"),
+# never a bare "the patient" or "what dose".
 CLINICAL_DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
-    (r"\b(?:my|our|this|the)\s+(?:real\s+)?patient\b", "Request concerns a real patient"),
-    (r"\breal\s+patient\b", "Request concerns a real patient"),
+    # --- English ---
+    (r"\b(?:my|our)\s+(?:real\s+)?patients?\b", "Request concerns a real patient"),
+    (r"\breal\s+patients?\b", "Request concerns a real patient"),
     (r"\bshould\s+(?:i|we)\s+(?:prescribe|administer|give|start|stop|discharge|operate)\b",
      "Request asks for a treatment decision"),
-    (r"\b(?:what|which)\s+(?:dose|dosage)\b", "Request asks for a dosing decision"),
+    (r"\b(?:what|which)\s+(?:dose|dosage)\b[^.?!]*\b(?:do|should|can|must)\s+(?:i|we)\b",
+     "Request asks for a dosing decision"),
+    (r"\bhow\s+much\b[^.?!]*\b(?:do|should|can|must)\s+(?:i|we)\s+(?:give|prescribe|administer)\b",
+     "Request asks for a dosing decision"),
     (r"\bis\s+(?:it|this)\s+(?:cancer|malignant|benign|a\s+tumou?r)\b",
      "Request asks for a definitive diagnosis"),
     (r"\bdiagnos(?:e|is)\s+(?:this|my|the)\s+(?:patient|scan|x-?ray|ct)\b",
@@ -40,13 +53,52 @@ CLINICAL_DIRECTIVE_PATTERNS: List[Tuple[str, str]] = [
     (r"\b(?:what's|what\s+is)\s+the\s+diagnosis\b", "Request asks for a definitive diagnosis"),
     (r"\btell me (?:the |what )?diagnosis\b", "Request asks for a definitive diagnosis"),
     (r"\bcan\s+(?:i|we)\s+discharge\b", "Request asks for a disposition decision"),
+    # --- Russian ---
+    (r"\b(?:мо[йеяию]\w*|наш\w*)\s+(?:реальн\w+\s+)?пациент\w*", "Request concerns a real patient"),
+    (r"\bреальн\w+\s+пациент\w*", "Request concerns a real patient"),
+    (r"\b(?:должен|должна|должны|стоит|можно|нужно|надо)\s+ли\s+(?:я\s+|мы\s+|мне\s+|нам\s+)?"
+     r"(?:назнач|выписа|да(?:ть|вать)|ввести|ввод|отмен|начать|прекрат|оперир)",
+     "Request asks for a treatment decision"),
+    (r"\b(?:какую|какая|какой)\s+доз\w*\b[^.?!]*\b(?:дать|давать|назначить|ввести|мне|нам)\b",
+     "Request asks for a dosing decision"),
+    (r"\bсколько\b[^.?!]*\b(?:мне|нам)\s+(?:дать|давать|назначить|ввести)\b",
+     "Request asks for a dosing decision"),
+    # Only as a question: "это рак лёгкого, который…" is a statement.
+    (r"\bэто\s+(?:рак|злокачествен|доброкачествен|опухол)\w*(?:\s+или\s+нет)?\s*\?",
+     "Request asks for a definitive diagnosis"),
+    (r"\b(?:поставь(?:те)?|постав(?:ить|ьте))\s+(?:мне\s+)?диагноз\b",
+     "Request asks for a definitive diagnosis"),
+    (r"\bкакой\s+у\s+(?:него|неё|нее|пациента|моего\s+пациента)\s+диагноз\b",
+     "Request asks for a definitive diagnosis"),
+    # --- Uzbek (Latin; both apostrophe forms) ---
+    (r"\bbemor(?:im|imiz)\w*", "Request concerns a real patient"),
+    (r"\bhaqiqiy\s+bemor\w*", "Request concerns a real patient"),
+    (r"\b(?:qanday|qancha|necha)\s+doza\w*[^.?!]*\b(?:berishim|beraymi|beramiz|tayinlashim|tayinlaymi)\b",
+     "Request asks for a dosing decision"),
+    (r"\b(?:tayinlashim|berishim|chiqarishim|to[ʻ'’`]xtatishim)\s+kerak", "Request asks for a treatment decision"),
+    (r"\btashxis\s+(?:qo[ʻ'’`]y|ayt)\w*", "Request asks for a definitive diagnosis"),
+    # "-mi" makes it a question: "bu saratonmi?" — is this cancer?
+    (r"\bbu\s+(?:saraton|o[ʻ'’`]sma)\w*mi\b", "Request asks for a definitive diagnosis"),
 ]
 
-# Protected identifiers that should never reach an AI service.
+# Protected identifiers that should never reach an AI service. Dates of birth
+# come in every shape the app's users write them: 04/11/1998, 04.11.1998
+# (Russian and Uzbek convention), 1998-11-04, and "born May 12 1980".
+_MONTHS = (
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|"
+    r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+)
 PHI_PATTERNS: List[Tuple[str, str]] = [
     (r"\b\d{3}-\d{2}-\d{4}\b", "Looks like a social security number"),
     (r"\bMRN[:\s#]*\d+\b", "Contains a medical record number"),
-    (r"\b\d{2}[/-]\d{2}[/-]\d{4}\b", "Contains a date of birth"),
+    (r"\b\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2}\b", "Contains a date of birth"),
+    (r"\b(?:19|20)\d{2}-\d{2}-\d{2}\b", "Contains a date of birth"),
+    (r"\b(?:born|dob|d\.o\.b\.?|date\s+of\s+birth)\b[^.?!\n]{0,20}?\b" + _MONTHS
+     + r"\b\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+(?:19|20)\d{2}\b",
+     "Contains a date of birth"),
+    (r"\b(?:born|dob|date\s+of\s+birth)\b[^.?!\n]{0,20}?\b\d{1,2}(?:st|nd|rd|th)?\s+"
+     + _MONTHS + r"\b\.?,?\s+(?:19|20)\d{2}\b",
+     "Contains a date of birth"),
     (r"\b[\w.+-]+@[\w-]+\.[\w.]+\b", "Contains an email address"),
     (r"\b(?:\+?\d[\d\s().-]{8,}\d)\b", "Contains what may be a phone number"),
 ]

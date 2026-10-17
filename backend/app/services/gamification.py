@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
+from sqlalchemy import update
 from sqlmodel import Session, func, select
 
 from app.models.analysis import AnalysisJob
@@ -91,11 +92,19 @@ def current_streak(user: User) -> int:
 
 
 def award_points(session: Session, user: User, amount: int) -> int:
-    """Add points and return the new total. Never goes negative."""
+    """Add points and return the new total. Only ever adds.
+
+    One `UPDATE ... SET points = points + n` rather than read, add, write
+    back: two awards landing together would otherwise both read the same
+    starting total, and one of them would be lost.
+    """
     if amount <= 0:
         return user.points
-    user.points = max(0, (user.points or 0) + amount)
-    session.add(user)
+    session.exec(  # type: ignore[call-overload]
+        update(User)
+        .where(User.id == user.id)  # type: ignore[arg-type]
+        .values(points=func.coalesce(User.points, 0) + amount)
+    )
     session.commit()
     session.refresh(user)
     return user.points

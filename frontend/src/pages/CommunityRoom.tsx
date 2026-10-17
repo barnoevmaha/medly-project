@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, MessageSquare, Send, Users } from "lucide-react";
+import { ArrowLeft, Loader2, MessageSquare, Send, Trash2, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   type CommunityDetail,
   type CommunityMessage,
 } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,6 +28,18 @@ import { cn } from "@/lib/utils";
 export default function CommunityRoom() {
   const { slug = "" } = useParams();
   const toast = useToast();
+  const { me } = useSession();
+  // Mirrors the server's rule: your own messages, or anyone's if you moderate.
+  const moderates = me?.role === "instructor" || me?.role === "admin";
+
+  async function remove(message: CommunityMessage) {
+    try {
+      await api.deleteCommunityMessage(message.id);
+      setMessages((prev) => prev.filter((item) => item.id !== message.id));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : t("room.deleteError"), "error");
+    }
+  }
   const { t, lang } = useLanguage();
 
   const [community, setCommunity] = useState<CommunityDetail | null>(null);
@@ -176,6 +189,17 @@ export default function CommunityRoom() {
                     <Badge variant="info">{message.author_role}</Badge>
                   )}
                   <span>{formatDateTime(message.created_at, lang)}</span>
+                  {(message.mine || moderates) && (
+                    <button
+                      type="button"
+                      onClick={() => void remove(message)}
+                      className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                      aria-label={t("room.deleteMessage")}
+                      title={t("room.deleteMessage")}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
                 <div
                   className={cn(

@@ -873,8 +873,18 @@ def _seed_challenges(session: Session) -> None:
             select(Challenge).where(Challenge.slug == spec["slug"])
         ).first()
         if existing:
+            changed = False
             if existing.cover != cover:
                 existing.cover = cover
+                changed = True
+            # The seeded challenges are the demo's recurring weekly set. Their
+            # deadlines are now enforced, so one that has run out is reopened
+            # for another round on boot; otherwise every seeded challenge would
+            # stop paying a few days after the first deploy, for good.
+            if existing.ends_at is not None and existing.ends_at <= datetime.now(timezone.utc):
+                existing.ends_at = datetime.now(timezone.utc) + timedelta(days=int(spec["days_left"]))
+                changed = True
+            if changed:
                 session.add(existing)
                 session.commit()
             continue

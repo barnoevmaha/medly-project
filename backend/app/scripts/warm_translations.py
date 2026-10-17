@@ -151,7 +151,9 @@ def warm(langs: Sequence[str], dry_run: bool, retry_identical: bool) -> int:
                     continue
 
                 print(f"  {model.__name__:<18} {len(rows):>4} rows · translating {todo} field(s)…", end=" ", flush=True)
-                localize.ensure_fields(session, localize.fields_for(rows, fields), lang)
+                localize.ensure_fields(
+                    session, localize.fields_for(rows, fields), lang, budget_seconds=0
+                )
 
                 left = _pending(rows, fields, lang)
                 same = len(_identical(rows, fields, lang))

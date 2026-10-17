@@ -151,6 +151,20 @@ def _case_out(session: Session, case: CaseReference, user: User) -> CaseOut:
     )
 
 
+def _require_owner(user: User, case: CaseReference) -> None:
+    """Only the teacher who authored a case — or an admin — may change it.
+
+    Being a teacher is what lets you author; it is not licence to attach
+    images to, sign off or publish a colleague's case. The sign-off in
+    particular is meant to name the person accountable for the redaction.
+    """
+    if case.created_by != user.id and user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the teacher who created this case can change it.",
+        )
+
+
 @router.get("/permissions")
 def permissions(user: User = Depends(get_current_user)) -> dict:
     return {
@@ -254,6 +268,7 @@ def add_image(
     case = session.get(CaseReference, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    _require_owner(user, case)
 
     result = anonymize(payload.metadata, payload.overlay_text)
     image = CaseImage(
@@ -281,6 +296,10 @@ def verify_anonymization(
     image = session.get(CaseImage, image_id)
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
+    case = session.get(CaseReference, image.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    _require_owner(user, case)
     if image.anonymization_status == "pending":
         raise HTTPException(
             status_code=409,
@@ -304,6 +323,7 @@ def publish(
     case = session.get(CaseReference, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    _require_owner(user, case)
 
     images = _images(session, case.id or 0)
     if not images:
@@ -334,6 +354,7 @@ def unpublish(
     case = session.get(CaseReference, case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    _require_owner(user, case)
     case.published = False
     session.add(case)
     session.commit()

@@ -34,13 +34,24 @@ def _database() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _fresh_auth_limits() -> Iterator[None]:
+def _fresh_process_state() -> Iterator[None]:
     """Every test logs in through the fixtures below, so the brute-force limits
-    on /api/auth would trip partway through the suite if they carried over."""
+    on /api/auth would trip partway through the suite if they carried over.
+    The same goes for the per-user posting limit — the demo accounts are
+    shared by every test that comments or posts."""
     from app.routers import auth
+
+    from app.services import medical_translate, posting, translate
+    from app.services import virtual_patient_service
 
     auth._ip_limiter.reset()
     auth._email_limiter.reset()
+    posting.reset()
+    virtual_patient_service._limiter.reset()
+    # Process-wide memory of past translations and provider outages: one
+    # test's simulated outage must not switch a provider off for the next.
+    medical_translate.reset()
+    translate.reset_cooldowns()
     yield
 
 
@@ -120,3 +131,8 @@ def outbound_http(monkeypatch) -> Callable[[Callable], None]:
             monkeypatch.setattr(httpx.Client, method, patched)
 
     return install
+
+
+@pytest.fixture
+def admin_headers(client: TestClient) -> dict:
+    return {"Authorization": f"Bearer {_token(client, 'admin@medly.dev')}"}

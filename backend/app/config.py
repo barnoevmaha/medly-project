@@ -186,6 +186,11 @@ class Settings:
     vp_debrief_max_output_tokens: int = int(
         os.getenv("VIRTUAL_PATIENT_DEBRIEF_MAX_OUTPUT_TOKENS", "1200")
     )
+    # Per-user ceiling on paid narration calls. Past it the authored text is
+    # shown instead — the same fallback as a provider outage, so a student is
+    # never stopped, only the bill is.
+    vp_rate_limit_per_minute: int = int(os.getenv("VIRTUAL_PATIENT_RATE_LIMIT_PER_MINUTE", "20"))
+    vp_rate_limit_per_hour: int = int(os.getenv("VIRTUAL_PATIENT_RATE_LIMIT_PER_HOUR", "200"))
 
     # Timestamped per-stage stream logging, and the /debug-stream probe.
     # Off unless explicitly enabled.
@@ -200,6 +205,20 @@ class Settings:
     ai_max_context_chars: int = int(os.getenv("MEDLY_AI_MAX_CONTEXT_CHARS", "12000"))
     ai_article_context_chars: int = int(os.getenv("MEDLY_AI_ARTICLE_CONTEXT_CHARS", "6000"))
     ai_note_context_chars: int = int(os.getenv("MEDLY_AI_NOTE_CONTEXT_CHARS", "1500"))
+
+    # Content translation runs inside the request that first needs it, so it
+    # gets a time budget: past it the page renders, with English where the
+    # translation was not ready, and the finished work is kept for next time.
+    translate_budget_seconds: float = float(os.getenv("MEDLY_TRANSLATE_BUDGET_SECONDS", "10"))
+    # Without a Gemini key, translation falls back to two free public services
+    # (an unofficial Google endpoint and MyMemory). They receive the text being
+    # translated — community names and descriptions included — so this can be
+    # switched off, leaving untranslated content in English.
+    free_translate_fallback: bool = _flag("MEDLY_FREE_TRANSLATE_FALLBACK", "true")
+
+    # Comments and community messages, per user.
+    post_rate_limit_per_minute: int = int(os.getenv("MEDLY_POST_RATE_LIMIT_PER_MINUTE", "6"))
+    post_rate_limit_per_hour: int = int(os.getenv("MEDLY_POST_RATE_LIMIT_PER_HOUR", "60"))
 
     # Per-user request ceiling, counted in this process.
     ai_rate_limit_per_minute: int = int(os.getenv("MEDLY_AI_RATE_LIMIT_PER_MINUTE", "12"))

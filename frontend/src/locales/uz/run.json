@@ -2,6 +2,7 @@
   "accuracy": "Aniqlik",
   "alreadyAnsweredInline": "Allaqachon javob berilgan — ball qayta berilmaydi",
   "alreadyAnsweredToast": "Siz bu savolga allaqachon javob bergansiz — bu safar ball berilmaydi",
+  "closedNoPoints": "Bu musobaqa yakunlangan — javoblar tekshiriladi, lekin ball berilmaydi",
   "answeredCount": "{n} ta javob berildi",
   "badgeUnlocked": "Nishon ochildi — {badge}",
   "complete": "Sinov yakunlandi",

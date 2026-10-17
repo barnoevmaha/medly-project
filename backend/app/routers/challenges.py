@@ -9,6 +9,7 @@ Two rules the endpoints exist to enforce:
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -111,6 +112,9 @@ class AnswerOut(BaseModel):
     rank: int
     # Badge labels, ready to show as-is.
     new_badges: List[str] = []
+    # True when the challenge had already ended: the answer is still marked,
+    # so the question can be practised, but it pays nothing.
+    challenge_closed: bool = False
 
 
 def _questions(session: Session, challenge_id: int) -> List[ChallengeQuestion]:
@@ -177,10 +181,36 @@ def _summary(session: Session, challenge: Challenge, user: User, lang: str) -> C
 
 
 def _get(session: Session, slug: str) -> Challenge:
-    challenge = session.exec(select(Challenge).where(Challenge.slug == slug)).first()
+    # Unpublished means not ready for students — the list hides them, and a
+    # direct link must not be the way round that.
+    challenge = session.exec(
+        select(Challenge).where(Challenge.slug == slug, Challenge.published == True)  # noqa: E712
+    ).first()
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
     return challenge
+
+
+def _is_closed(challenge: Challenge) -> bool:
+    return challenge.ends_at is not None and challenge.ends_at <= datetime.now(timezone.utc)
+
+
+# A typed answer may leave out filler words, but it must contain every word
+# that carries the meaning: "pneu" is not "pneumonia", and "acute" alone is
+# not "acute kidney injury".
+_FILLER = {"a", "an", "the", "of", "and", "or", "in", "on", "to", "with", "is", "are"}
+
+
+def _answer_words(text: str) -> List[str]:
+    return [word for word in re.findall(r"[^\W_]+", text.lower()) if word not in _FILLER]
+
+
+def short_answer_matches(given: str, expected: str) -> bool:
+    expected_words = _answer_words(expected)
+    if not expected_words:
+        return False
+    given_words = set(_answer_words(given))
+    return all(word in given_words for word in expected_words)
 
 
 @router.get("", response_model=List[ChallengeOut])
@@ -340,12 +370,9 @@ def answer(
                 0.05, abs(float(target)) * 0.01
             )
         else:
-            expected = (question.answer_text or "").strip().lower()
-            given = given_text.lower()
-            correct = bool(expected) and (
-                given == expected or (len(given) >= 4 and given in expected)
-            )
-        awarded = question.points if correct else 0
+            correct = short_answer_matches(given_text, question.answer_text or "")
+        closed = _is_closed(challenge)
+        awarded = question.points if correct and not closed else 0
         session.add(
             ChallengeAnswer(
                 user_id=user.id or 0,
@@ -439,4 +466,5 @@ def answer(
         total_points=user.points,
         rank=gamification.rank_of(session, user),
         new_badges=new_badges,
+        challenge_closed=_is_closed(challenge),
     )

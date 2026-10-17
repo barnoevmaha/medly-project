@@ -14,7 +14,7 @@ from app.models.social import Article, ArticleComment, ArticleLike, SavedItem
 from app.models.enums import Role
 from app.models.user import User
 from app.security import get_current_user, require_roles
-from app.services import gamification, localize
+from app.services import gamification, localize, posting
 from app.services.article_images import clear_image, ensure_article_image
 
 router = APIRouter(prefix="/api/feed", tags=["feed"])
@@ -237,11 +237,12 @@ def add_comment(
     user: User = Depends(get_current_user),
 ) -> CommentOut:
     article = session.exec(select(Article).where(Article.slug == slug)).first()
-    if not article:
+    if not article or not article.published:
         raise HTTPException(status_code=404, detail="Article not found")
     body = payload.body.strip()
     if not body:
         raise HTTPException(status_code=422, detail="A comment cannot be empty")
+    posting.enforce_post_limit(user.id or 0)
 
     comment = ArticleComment(article_id=article.id or 0, user_id=user.id or 0, body=body)
     session.add(comment)

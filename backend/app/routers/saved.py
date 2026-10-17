@@ -14,6 +14,7 @@ from sqlmodel import Session, func, or_, select
 
 from app.db import get_session
 from app.lang import get_lang
+from app.models.enums import Role
 from app.models.social import Article, BookProgress, Resource, SavedItem
 from app.models.user import User
 from app.security import get_current_user
@@ -49,6 +50,9 @@ class ResourceOut(BaseModel):
     language: str
     duration_minutes: Optional[int]
     saved: bool
+    # Premium item and the viewer is not premium: the links above are empty,
+    # and the UI offers the upgrade instead of the content.
+    locked: bool = False
 
 
 class SavedOut(BaseModel):
@@ -70,6 +74,20 @@ class SavedOut(BaseModel):
 class SaveIn(BaseModel):
     item_type: str
     item_key: str
+
+
+def _can_open(resource: Resource, user: User) -> bool:
+    """Whether `user` may receive this resource's file and stream links.
+
+    Enforced here, on the links themselves, because a premium badge on a card
+    protects nothing if the response carries the URL anyway. Teaching staff
+    see everything they might assign.
+    """
+    return (
+        not resource.premium
+        or bool(user.is_premium)
+        or user.role in (Role.INSTRUCTOR, Role.ADMIN)
+    )
 
 
 def _saved_keys(session: Session, user_id: int, item_type: str) -> set:
@@ -154,10 +172,10 @@ def list_resources(
             downloads=resource.downloads,
             duration=resource.duration,
             premium=resource.premium,
-            url=resource.url,
-            video_url=resource.video_url,
+            url=resource.url if _can_open(resource, user) else "",
+            video_url=resource.video_url if _can_open(resource, user) else "",
             orientation=resource.orientation,
-            pdf_url=resource.pdf_url,
+            pdf_url=resource.pdf_url if _can_open(resource, user) else "",
             cover_hue=resource.cover_hue,
             cover=resource.cover,
             publisher=resource.publisher,
@@ -168,6 +186,7 @@ def list_resources(
             language=resource.language,
             duration_minutes=resource.duration_minutes,
             saved=f"{resource.kind}:{resource.slug}" in saved,
+            locked=not _can_open(resource, user),
         )
         for resource in resources
     ]
@@ -291,7 +310,7 @@ def list_saved(
                     description=localize.read(resource, "description", lang),
                     # Empty when the demo resource has no file behind it. The UI
                     # says so rather than offering a button that goes nowhere.
-                    href=resource.url,
+                    href=resource.url if _can_open(resource, user) else "",
                     meta=meta,
                     premium=resource.premium,
                     cover_hue=resource.cover_hue,

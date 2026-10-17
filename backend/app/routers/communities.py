@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field as PydanticField
-from sqlmodel import Session, func, or_, select
+from sqlmodel import Session, and_, func, or_, select
 
 from app.db import get_session
 from app.lang import get_lang
@@ -15,7 +15,7 @@ from app.models.community import Community, CommunityMember, CommunityMessage
 from app.models.enums import Role
 from app.models.user import User
 from app.security import get_current_user
-from app.services import gamification, localize
+from app.services import gamification, localize, posting
 
 router = APIRouter(prefix="/api/communities", tags=["communities"])
 
@@ -309,15 +309,39 @@ def leave(
 @router.get("/{slug}/messages", response_model=List[MessageOut])
 def messages(
     slug: str,
+    limit: int = Query(default=100, ge=1, le=200),
+    before_id: Optional[int] = Query(
+        default=None, description="Return messages older than this one (paging back)"
+    ),
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> List[MessageOut]:
+    """The newest `limit` messages, oldest first — never the whole room.
+
+    A busy room would otherwise send its entire history on every visit.
+    Pass the oldest id you hold as `before_id` to page further back.
+    """
     community = _get(session, slug)
-    rows = session.exec(
-        select(CommunityMessage)
-        .where(CommunityMessage.community_id == community.id)
-        .order_by(CommunityMessage.created_at.asc())  # type: ignore[union-attr]
+    statement = select(CommunityMessage).where(CommunityMessage.community_id == community.id)
+    if before_id is not None:
+        anchor = session.get(CommunityMessage, before_id)
+        if anchor is not None and anchor.community_id == community.id:
+            statement = statement.where(
+                or_(
+                    CommunityMessage.created_at < anchor.created_at,
+                    and_(
+                        CommunityMessage.created_at == anchor.created_at,
+                        CommunityMessage.id < anchor.id,  # type: ignore[operator]
+                    ),
+                )
+            )
+    newest_first = session.exec(
+        statement.order_by(
+            CommunityMessage.created_at.desc(),  # type: ignore[union-attr]
+            CommunityMessage.id.desc(),  # type: ignore[union-attr]
+        ).limit(limit)
     ).all()
+    rows = list(reversed(newest_first))
 
     authors = {
         person.id: person
@@ -368,6 +392,7 @@ def post_message(
     body = payload.body.strip()
     if not body:
         raise HTTPException(status_code=422, detail="Message cannot be empty")
+    posting.enforce_post_limit(user.id or 0)
 
     message = CommunityMessage(
         community_id=community.id or 0, user_id=user.id, body=body
@@ -384,3 +409,19 @@ def post_message(
         created_at=message.created_at,
         mine=True,
     )
+
+
+@router.delete("/messages/{message_id}", status_code=204)
+def delete_message(
+    message_id: int,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Remove a message: your own, or anyone's if you moderate (instructor/admin)."""
+    message = session.get(CommunityMessage, message_id)
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.user_id != user.id and user.role not in (Role.INSTRUCTOR, Role.ADMIN):
+        raise HTTPException(status_code=403, detail="That is not your message")
+    session.delete(message)
+    session.commit()

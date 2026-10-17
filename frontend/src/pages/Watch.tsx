@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { useLanguage } from "@/lib/i18n";
+import { PremiumLock } from "@/components/ui/premium-lock";
 import { useProvideAiContext } from "@/lib/ai-context";
 import { api, type LibraryResource } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -111,23 +112,27 @@ export default function Watch() {
       </Link>
 
       <Card className="overflow-hidden p-0 shadow-medium">
-        <div
-          className={cn(
-            "bg-black",
-            portrait
-              ? "mx-auto aspect-[9/16] h-[min(70vh,32rem)] max-w-full"
-              : "aspect-video w-full"
-          )}
-        >
-          <iframe
-            src={toEmbed(resource.video_url)}
-            title={resource.title}
-            className="h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-          />
-        </div>
+        {resource.locked ? (
+          <PremiumLock className="border-b border-border" />
+        ) : (
+          <div
+            className={cn(
+              "bg-black",
+              portrait
+                ? "mx-auto aspect-[9/16] h-[min(70vh,32rem)] max-w-full"
+                : "aspect-video w-full"
+            )}
+          >
+            <iframe
+              src={toEmbed(resource.video_url)}
+              title={resource.title}
+              className="h-full w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
+        )}
 
         <div className="p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">

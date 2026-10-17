@@ -21,7 +21,9 @@ each string is only ever sent to either endpoint once.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+import threading
+import time
+from typing import Callable, Dict, Optional
 
 import httpx
 
@@ -35,6 +37,29 @@ _MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get"
 _MAX_CHUNK_CHARS = 1800
 
 _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+
+# A provider that just failed is skipped for a while. Without this, an outage
+# (or a network that blocks the endpoint) costs every string of every request
+# a full timeout, and a cold page in Russian takes minutes.
+_COOLDOWN_SECONDS = 300.0
+_down_until: Dict[str, float] = {}
+_down_lock = threading.Lock()
+
+
+def _call(name: str, provider: Callable[[str, str, str], Optional[str]], text: str, target: str, source: str) -> Optional[str]:
+    with _down_lock:
+        if time.monotonic() < _down_until.get(name, 0.0):
+            return None
+    result = provider(text, target, source)
+    if result is None:
+        with _down_lock:
+            _down_until[name] = time.monotonic() + _COOLDOWN_SECONDS
+    return result
+
+
+def reset_cooldowns() -> None:
+    with _down_lock:
+        _down_until.clear()
 
 
 def _split_into_chunks(text: str) -> list[str]:
@@ -104,9 +129,9 @@ def translate_text(text: str, target: str, source: str = "en") -> str:
     chunks = _split_into_chunks(text)
     translated: list[str] = []
     for chunk in chunks:
-        result = _google_translate(chunk, target, source)
+        result = _call("google", _google_translate, chunk, target, source)
         if result is None:
-            result = _mymemory_translate(chunk, target, source)
+            result = _call("mymemory", _mymemory_translate, chunk, target, source)
         translated.append(result if result is not None else chunk)
 
     return "\n\n".join(translated) if len(chunks) > 1 else translated[0]

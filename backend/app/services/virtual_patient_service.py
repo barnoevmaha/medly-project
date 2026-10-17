@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 
 from app.config import settings
 from app.services import gemini
+from app.services.ratelimit import SlidingWindowLimiter
 
 logger = logging.getLogger("medly.virtual_patient")
 
@@ -118,6 +119,10 @@ class Narration:
     used_model: bool
 
 
+# Process-wide, per user, like the assistant's (see app/services/ratelimit.py).
+_limiter = SlidingWindowLimiter(settings.vp_rate_limit_per_minute, settings.vp_rate_limit_per_hour)
+
+
 def _generate(
     *,
     system_prompt: str,
@@ -125,14 +130,21 @@ def _generate(
     fallback: str,
     max_output_tokens: int,
     temperature: float,
+    user_id: int,
     history: Optional[List[Dict[str, str]]] = None,
 ) -> Narration:
     """Ask Gemini, and fall back to the authored text on any failure.
 
     The simulation is the product; the prose is a finish on it. A provider
     outage must never stop a student mid-case, so every error here is caught
-    and logged rather than raised.
+    and logged rather than raised — and a user over their narration ceiling
+    gets the same authored text, without a call being made.
     """
+    if not is_configured():
+        return Narration(text=fallback, used_model=False)
+    if not _limiter.check(f"vp:{user_id}").allowed:
+        logger.info("virtual patient narration rate-limited user=%s; using authored text", user_id)
+        return Narration(text=fallback, used_model=False)
     try:
         result = gemini.generate(
             system_prompt=system_prompt,
@@ -161,6 +173,7 @@ def patient_says(
     patient_sex: str,
     situation: str,
     authored_line: str,
+    user_id: int,
     student_message: str = "",
     lang: str = "en",
 ) -> Narration:
@@ -198,6 +211,7 @@ def patient_says(
         # A little warmth so the patient does not sound like a form, but not
         # enough to start improvising history.
         temperature=0.7,
+        user_id=user_id,
     )
 
 
@@ -212,6 +226,7 @@ def debrief(
     max_score: int,
     passed: bool,
     decisions: List[Dict[str, object]],
+    user_id: int,
     lang: str = "en",
 ) -> Narration:
     """Explain a finished run. The verdicts are inputs, not questions."""
@@ -244,6 +259,7 @@ def debrief(
         fallback=authored_debrief,
         max_output_tokens=settings.vp_debrief_max_output_tokens,
         temperature=0.4,
+        user_id=user_id,
     )
 
 

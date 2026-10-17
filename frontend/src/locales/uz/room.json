@@ -1,5 +1,7 @@
 {
   "backToCommunities": "Hamjamiyatlar",
+  "deleteError": "Xabar oʻchirilmadi",
+  "deleteMessage": "Xabarni oʻchirish",
   "joinCommunity": "Hamjamiyatga qoʻshilish",
   "leaveCommunity": "Hamjamiyatni tark etish",
   "loadError": "Bu hamjamiyatni ochib boʻlmadi",

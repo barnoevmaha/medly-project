@@ -2,6 +2,7 @@
   "accuracy": "Accuracy",
   "alreadyAnsweredInline": "Already answered — no points awarded again",
   "alreadyAnsweredToast": "You have already answered this one — no points this time",
+  "closedNoPoints": "This challenge has ended — answers are still marked, but no points are awarded",
   "answeredCount": "{n} answered",
   "badgeUnlocked": "Badge unlocked — {badge}",
   "complete": "Challenge complete",

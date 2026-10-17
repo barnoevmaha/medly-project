@@ -330,6 +330,7 @@ def test_gemini_failure_does_not_break_narration(override_settings, outbound_htt
         patient_sex="male",
         situation="Arrival",
         authored_line="I can't get my breath.",
+        user_id=1,
     )
     assert result.text == "I can't get my breath."
     assert result.used_model is False

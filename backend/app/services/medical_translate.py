@@ -22,9 +22,13 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
+import time
 from collections import Counter
-from typing import List, Optional, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor, wait
+from typing import Dict, List, Optional, Sequence, Tuple
 
+from app.config import settings
 from app.services import medical_glossary as glossary
 from app.services.translate import translate_text
 
@@ -168,12 +172,19 @@ def _parse_array(raw: str, expected: int) -> Optional[List[str]]:
     return parsed
 
 
+# After Gemini fails outright (network, quota, auth), the next requests skip
+# it for a minute rather than each waiting out its retries again.
+_GEMINI_COOLDOWN_SECONDS = 60.0
+_gemini_down_until = 0.0
+
+
 def _gemini_batch(texts: Sequence[str], target: str) -> Optional[List[str]]:
     """One call for the whole chunk, or None if it cannot be trusted."""
+    global _gemini_down_until
     from app.services import gemini
 
     credentials = _credentials()
-    if not credentials.api_key:
+    if not credentials.api_key or time.monotonic() < _gemini_down_until:
         return None
 
     joined = "\n".join(texts)
@@ -198,6 +209,8 @@ def _gemini_batch(texts: Sequence[str], target: str) -> Optional[List[str]]:
         )
     except gemini.GeminiError as error:
         logger.warning("medical translator unavailable (%s); using fallback", error.detail)
+        if not isinstance(error, gemini.GeminiBadResponse):
+            _gemini_down_until = time.monotonic() + _GEMINI_COOLDOWN_SECONDS
         return None
     except Exception:  # noqa: BLE001 — translation must never break a request
         logger.exception("medical translator crashed; using fallback")
@@ -226,43 +239,118 @@ def _chunks(texts: Sequence[str]) -> List[List[int]]:
 # Public
 # --------------------------------------------------------------------------
 
-def translate_batch(texts: Sequence[str], target: str, source: str = "en") -> List[str]:
+# Translations that finished after a request stopped waiting for them. The
+# next request that asks for the same string gets it from here at once, and
+# localize.ensure_fields then stores it — so overrunning work is never thrown
+# away, and a slow provider still converges on a fully translated page.
+_MEMO_LIMIT = 5000
+_memo: Dict[Tuple[str, str], str] = {}
+_memo_lock = threading.Lock()
+_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="medly-translate")
+
+
+def reset() -> None:
+    """Forget remembered translations and any Gemini cooldown (for tests)."""
+    global _gemini_down_until
+    _gemini_down_until = 0.0
+    with _memo_lock:
+        _memo.clear()
+
+
+def _remember(target: str, source_text: str, translated: str) -> None:
+    with _memo_lock:
+        if len(_memo) >= _MEMO_LIMIT:
+            _memo.clear()
+        _memo[(target, source_text)] = translated
+
+
+def _translate_chunk(texts: Sequence[str], target: str, source: str) -> List[Optional[str]]:
+    """Gemini for the chunk, the free services for whatever it could not do.
+
+    Returns one entry per input: the translation, or None to keep the English.
+    Every accepted translation is also remembered (see `_memo`).
+    """
+    out: List[Optional[str]] = [None] * len(texts)
+    candidate = _gemini_batch(texts, target)
+    for position, text in enumerate(texts):
+        if candidate is not None:
+            problem = validation_error(text, candidate[position], target)
+            if not problem:
+                out[position] = candidate[position]
+                continue
+            logger.warning("rejected translation (%s): %.60s", problem, text)
+        if not settings.free_translate_fallback:
+            continue
+        # Worse at clinical register than Gemini, better than English.
+        legacy = translate_text(text, target, source)
+        problem = validation_error(text, legacy, target)
+        if problem:
+            logger.warning("fallback also rejected (%s): %.60s", problem, text)
+            continue
+        out[position] = legacy
+    for text, translated in zip(texts, out):
+        if translated is not None:
+            _remember(target, text, translated)
+    return out
+
+
+def translate_batch(
+    texts: Sequence[str],
+    target: str,
+    source: str = "en",
+    budget_seconds: Optional[float] = None,
+) -> List[str]:
     """Translate every string, in order. Never raises, never returns fewer.
 
-    A string that cannot be translated safely comes back as the English. The
-    caller (localize.ensure_fields) treats an unchanged long string as a
-    fallback and tells the reader the page is partly English, so degrading
-    here is visible rather than silent.
+    A string that cannot be translated safely, or in time, comes back as the
+    English. The caller (localize.ensure_fields) treats an unchanged long
+    string as a fallback and tells the reader the page is partly English, so
+    degrading here is visible rather than silent.
+
+    Chunks run in parallel, and the whole batch waits at most
+    `budget_seconds` (default: MEDLY_TRANSLATE_BUDGET_SECONDS; 0 waits as long
+    as it takes, for scripts). Work still running when the budget ends keeps
+    going and is remembered for the next request.
     """
     if target == source or target not in LANGUAGE_NAMES:
         return list(texts)
 
     out = list(texts)
-    needs_fallback: List[int] = []
-
-    for group in _chunks(texts):
-        candidate = _gemini_batch([texts[i] for i in group], target)
-        if candidate is None:
-            needs_fallback.extend(group)
-            continue
-        for position, index in enumerate(group):
-            problem = validation_error(texts[index], candidate[position], target)
-            if problem:
-                logger.warning("rejected translation (%s): %.60s", problem, texts[index])
-                needs_fallback.append(index)
+    pending: List[int] = []
+    with _memo_lock:
+        for index, text in enumerate(texts):
+            known = _memo.get((target, text))
+            if known is not None:
+                out[index] = known
             else:
-                out[index] = candidate[position]
+                pending.append(index)
+    if not pending:
+        return out
 
-    # Whatever Gemini could not do safely goes to the general-purpose
-    # translator, which is worse at clinical register but better than English.
-    for index in needs_fallback:
-        legacy = translate_text(texts[index], target, source)
-        problem = validation_error(texts[index], legacy, target)
-        if problem:
-            logger.warning("fallback also rejected (%s): %.60s", problem, texts[index])
-            continue  # leaves the English in place
-        out[index] = legacy
-
+    budget = settings.translate_budget_seconds if budget_seconds is None else budget_seconds
+    pending_texts = [texts[i] for i in pending]
+    futures: Dict[Future, List[int]] = {
+        _pool.submit(_translate_chunk, [pending_texts[i] for i in group], target, source): [
+            pending[i] for i in group
+        ]
+        for group in _chunks(pending_texts)
+    }
+    done, not_done = wait(futures, timeout=budget if budget and budget > 0 else None)
+    if not_done:
+        logger.warning(
+            "translation budget of %.1fs ran out with %d of %d chunk(s) unfinished; "
+            "showing English for now",
+            budget, len(not_done), len(futures),
+        )
+    for future in done:
+        try:
+            results = future.result()
+        except Exception:  # noqa: BLE001 — translation must never break a request
+            logger.exception("translation chunk crashed; keeping English")
+            continue
+        for index, translated in zip(futures[future], results):
+            if translated is not None:
+                out[index] = translated
     return out
 
 

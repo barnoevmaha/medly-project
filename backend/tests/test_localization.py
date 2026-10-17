@@ -23,7 +23,7 @@ def offline_translator(monkeypatch):
     """
     calls: list[tuple[int, str]] = []
 
-    def fake(texts, target, source="en"):
+    def fake(texts, target, source="en", budget_seconds=None):
         calls.append((len(texts), target))
         return [f"«{target}» {t}" for t in texts]
 

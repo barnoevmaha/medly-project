@@ -5,9 +5,9 @@ Every translatable model follows the same shape: an English column (`title`,
 `description`, `name`, `prompt`, ...) plus a `<field>_ru` and `<field>_uz`
 sibling that starts empty. `read()` returns the column for the requested
 language, and `ensure_fields()` fills in whichever siblings are still empty
-by calling out to translate.py — in parallel, since a cold cache on a list
-page can mean a few dozen strings at once and doing them one at a time would
-make the first visit in a language feel broken.
+by calling out to translate.py — in parallel and within a time budget, since a
+cold cache on a list page can mean a few dozen strings at once and doing them
+one at a time would make the first visit in a language feel broken.
 
 This is what makes translation "automatic" rather than hand-maintained: a
 community a student created ten seconds ago and a community seeded on day one
@@ -17,7 +17,7 @@ Russian. Nothing about content translation is authored by hand.
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import Sequence
+from typing import Optional, Sequence
 
 from sqlmodel import Session
 
@@ -77,7 +77,12 @@ def read(obj: object, field: str, lang: str) -> str:
     return english
 
 
-def ensure_fields(session: Session, refs: Sequence[FieldRef], lang: str) -> None:
+def ensure_fields(
+    session: Session,
+    refs: Sequence[FieldRef],
+    lang: str,
+    budget_seconds: Optional[float] = None,
+) -> None:
     """Fill every `<field>_<lang>` in `refs` that is still empty, then commit
     once. No-op for English (nothing to translate) and for fields that are
     already cached from a previous view.
@@ -109,7 +114,7 @@ def ensure_fields(session: Session, refs: Sequence[FieldRef], lang: str) -> None
     # medical_translate never raises and always returns the same number of
     # strings; anything it could not do safely comes back as the English.
     translated_values = medical_translate.translate_batch(
-        [source for _obj, _attr, source in pending], lang
+        [source for _obj, _attr, source in pending], lang, budget_seconds=budget_seconds
     )
 
     for (obj, target_attr, source), translated in zip(pending, translated_values):

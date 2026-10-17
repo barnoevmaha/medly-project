@@ -205,13 +205,37 @@ def stage_view(session: Session, stage: VirtualPatientStage, lang: str = "en") -
 
 
 def max_score_for(session: Session, case_id: int) -> int:
-    """The best reachable total: the highest-scoring option at every stage."""
-    total = 0
-    for stage in stages_for(session, case_id):
-        deltas = [o.score_delta for o in options_for(session, stage.id or 0)]
-        if deltas:
-            total += max(deltas)
-    return total
+    """The best total one run can actually reach.
+
+    A run walks one path through the stage graph, so the ceiling is the
+    best-scoring *path* from the first stage — not the best option at every
+    stage added together. Summing every stage counts branches no single run
+    can visit (the "deterioration" detour only exists after a mistake), and a
+    flawless run would then score less than 100%.
+
+    A stage is never counted twice on one path, and an option that kills the
+    patient ends the path, exactly as it ends the run.
+    """
+    case = session.get(VirtualPatientCase, case_id)
+    stages = {stage.key: stage for stage in stages_for(session, case_id)}
+    if case is None or case.first_stage_key not in stages:
+        return 0
+    options = {key: options_for(session, stage.id or 0) for key, stage in stages.items()}
+
+    def best_from(key: str, visited: frozenset) -> int:
+        stage = stages.get(key)
+        if stage is None or stage.is_terminal or key in visited:
+            return 0
+        here = visited | {key}
+        totals = [0]
+        for option in options[key]:
+            total = option.score_delta
+            if option.state_after != PatientState.FAILED.value:
+                total += best_from(option.next_stage_key or key, here)
+            totals.append(total)
+        return max(totals)
+
+    return max(0, best_from(case.first_stage_key, frozenset()))
 
 
 # --------------------------------------------------------------------------

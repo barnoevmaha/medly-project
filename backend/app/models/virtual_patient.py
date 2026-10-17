@@ -210,6 +210,10 @@ class VirtualPatientSession(SQLModel, table=True):
     status: str = Field(default="in_progress", index=True)
     outcome: str = Field(default="")
     passed: bool = Field(default=False)
+    # Model-written debriefs, by language: {"en": "...", "ru": "..."}. A finished
+    # run's result never changes, so its debrief is written once per language
+    # rather than paid for on every visit to the result page.
+    debrief_cache_json: str = Field(default="{}")
 
     started_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)

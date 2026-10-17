@@ -1,5 +1,7 @@
 {
   "backToCommunities": "Communities",
+  "deleteError": "Message not deleted",
+  "deleteMessage": "Delete message",
   "joinCommunity": "Join community",
   "leaveCommunity": "Leave community",
   "loadError": "Could not open this community",

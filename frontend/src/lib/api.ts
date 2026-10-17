@@ -807,6 +807,8 @@ export interface LibraryResource {
   level: string;
   topic: string;
   saved: boolean;
+  /** Premium, and this account cannot open it: the links are empty. */
+  locked?: boolean;
 }
 
 export interface SavedEntry {
@@ -923,6 +925,8 @@ export interface AnswerResult {
   total_points: number;
   rank: number;
   new_badges: string[];
+  /** The challenge had ended: the answer was marked but paid nothing. */
+  challenge_closed?: boolean;
 }
 
 /* ---------- profile ---------- */
@@ -1261,6 +1265,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ body }),
     }),
+  deleteCommunityMessage: (id: number) =>
+    request<void>(`/api/communities/messages/${id}`, { method: "DELETE" }),
 
   /* challenges */
   challenges: () => request<ChallengeSummary[]>("/api/challenges"),

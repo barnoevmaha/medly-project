@@ -149,6 +149,8 @@ export default function ChallengeRun() {
         toast(t("run.correctPoints", { n: outcome.points_awarded }));
       } else if (outcome.already_answered) {
         toast(t("run.alreadyAnsweredToast"), "info");
+      } else if (outcome.challenge_closed) {
+        toast(t("run.closedNoPoints"), "info");
       }
       outcome.new_badges.forEach((badge) => toast(t("run.badgeUnlocked", { badge }), "success"));
       await refresh();

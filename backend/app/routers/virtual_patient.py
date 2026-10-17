@@ -13,6 +13,8 @@ returns a complete, playable stage using the authored text.
 """
 from __future__ import annotations
 
+import json
+
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -291,7 +293,7 @@ def _stage_out(
 
 
 def _narrate_stage(
-    case: VirtualPatientCase, view: engine.StageView, lang: str
+    case: VirtualPatientCase, view: engine.StageView, lang: str, user_id: int
 ) -> StageOut:
     """Give the patient a voice, or use the authored line if we cannot.
 
@@ -313,6 +315,7 @@ def _narrate_stage(
         patient_sex=case.patient_sex,
         situation=f"{view.title}. {view.narrative}".strip(),
         authored_line=view.patient_line,
+        user_id=user_id,
         lang=lang,
     )
     return _stage_out(view, patient_line=spoken.text, narrated=spoken.used_model)
@@ -330,7 +333,7 @@ def _session_out(
     stage = engine.get_stage(db, case.id or 0, run.current_stage_key)
     view = engine.stage_view(db, stage, lang)
     stage_out = (
-        _narrate_stage(case, view, lang)
+        _narrate_stage(case, view, lang, run.user_id)
         if narrate
         else _stage_out(view, patient_line=view.patient_line, narrated=False)
     )
@@ -562,7 +565,7 @@ def submit_decision(
 
     next_view = result.next_stage
     assert next_view is not None  # the engine always returns a stage
-    stage_out = _narrate_stage(case, next_view, lang)
+    stage_out = _narrate_stage(case, next_view, lang, user.id or 0)
 
     return DecisionOut(
         disclaimer=_disclaimer(lang),
@@ -599,6 +602,38 @@ def abandon(
     return _session_out(db, run, case, narrate=False, lang=lang)
 
 
+def _debrief_cache(run: VirtualPatientSession) -> Dict[str, str]:
+    try:
+        value = json.loads(run.debrief_cache_json or "{}")
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _cached_debrief(
+    db: Session, run: VirtualPatientSession, lang: str
+) -> Optional[narration.Narration]:
+    """The model-written debrief for this run in `lang`, if one was written."""
+    text = _debrief_cache(run).get(lang)
+    return narration.Narration(text=text, used_model=True) if isinstance(text, str) and text else None
+
+
+def _remember_debrief(
+    db: Session, run: VirtualPatientSession, lang: str, written: narration.Narration
+) -> None:
+    """Keep a model-written debrief. The authored fallback is not cached, so a
+    run whose first visit fell back can still get the written one later."""
+    if not written.used_model:
+        return
+    cache = _debrief_cache(run)
+    if cache.get(lang) == written.text:
+        return
+    cache[lang] = written.text
+    run.debrief_cache_json = json.dumps(cache, ensure_ascii=False)
+    db.add(run)
+    db.commit()
+
+
 @router.get("/sessions/{session_id}/result", response_model=ResultOut)
 def get_result(
     session_id: int,
@@ -631,7 +666,8 @@ def get_result(
         return authored.get((d.stage_key, d.option_key), (d.option_label, d.feedback))[1]
 
     records = engine.decisions_for(db, run.id or 0)
-    written = narration.debrief(
+    written = _cached_debrief(db, run, lang) or narration.debrief(
+        user_id=user.id or 0,
         case_title=localize.read(case, "title", lang),
         correct_diagnosis=localize.read(case, "correct_diagnosis", lang),
         learning_objectives=localize.read(case, "learning_objectives", lang),
@@ -652,6 +688,7 @@ def get_result(
             for d in records
         ],
     )
+    _remember_debrief(db, run, lang, written)
 
     return ResultOut(
         session_id=run.id or 0,

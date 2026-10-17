@@ -1,5 +1,7 @@
 {
   "backToCommunities": "Сообщества",
+  "deleteError": "Сообщение не удалено",
+  "deleteMessage": "Удалить сообщение",
   "joinCommunity": "Вступить в сообщество",
   "leaveCommunity": "Покинуть сообщество",
   "loadError": "Не удалось открыть это сообщество",

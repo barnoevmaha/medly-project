@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { useLanguage } from "@/lib/i18n";
+import { PremiumLock } from "@/components/ui/premium-lock";
 import { useProvideAiContext } from "@/lib/ai-context";
 import { api, type LibraryResource } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -110,12 +111,14 @@ export default function Read() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href={source} target="_blank" rel="noreferrer">
-              <Button variant="outline">
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                {t("read.openNewTab")}
-              </Button>
-            </a>
+            {!resource.locked && (
+              <a href={source} target="_blank" rel="noreferrer">
+                <Button variant="outline">
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  {t("read.openNewTab")}
+                </Button>
+              </a>
+            )}
             <Button
               variant={resource.saved ? "outline" : "default"}
               onClick={() => void toggleSave()}
@@ -131,21 +134,29 @@ export default function Read() {
         </div>
       </Card>
 
-      <Card className="overflow-hidden p-0">
-        <iframe
-          src={source}
-          title={`${resource.title} — reader`}
-          className="h-[75vh] w-full"
-          loading="lazy"
-        />
-      </Card>
-      <p className="mt-3 text-xs text-muted-foreground">
-        {t("read.blockedHint")}{" "}
-        <a href={source} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-          {t("read.openNewTab")}
-        </a>
-        .
-      </p>
+      {resource.locked ? (
+        <Card className="overflow-hidden p-0">
+          <PremiumLock />
+        </Card>
+      ) : (
+        <>
+          <Card className="overflow-hidden p-0">
+            <iframe
+              src={source}
+              title={`${resource.title} — reader`}
+              className="h-[75vh] w-full"
+              loading="lazy"
+            />
+          </Card>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {t("read.blockedHint")}{" "}
+            <a href={source} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+              {t("read.openNewTab")}
+            </a>
+            .
+          </p>
+        </>
+      )}
     </>
   );
 }

@@ -11,9 +11,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import hmac
+
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, func, select
 
@@ -95,6 +97,38 @@ def get_current_user(
     if user is None or not user.is_active:
         raise credentials_error
     return user
+
+
+PROXY_SECRET_HEADER = "x-medly-proxy-secret"
+PROXY_CLIENT_HEADER = "x-medly-client-ip"
+
+
+def client_ip(request: Request) -> str:
+    """The address a request came from, as far as it can be trusted.
+
+    `X-Forwarded-For` is a list each proxy appends to, and anything left of
+    the last entry was written by the client — so taking the first entry, as
+    a blanket "trust the header" does, lets anyone pick their own address and
+    walk round a per-IP limit. Instead:
+
+      1. A request through our own nginx carries the shared proxy secret and
+         the browser's address as nginx saw it. Believed only with the secret.
+      2. Otherwise, with a secret configured, the last X-Forwarded-For entry:
+         the one the platform's own proxy added, which a client cannot forge.
+      3. With no secret configured, the address uvicorn derived — unchanged
+         behaviour for a deployment that has not set one up.
+    """
+    secret = settings.proxy_secret
+    if secret:
+        presented = request.headers.get(PROXY_SECRET_HEADER, "")
+        vouched = request.headers.get(PROXY_CLIENT_HEADER, "").strip()
+        if vouched and hmac.compare_digest(presented.encode(), secret.encode()):
+            return vouched
+        forwarded = request.headers.get("x-forwarded-for", "")
+        nearest = forwarded.split(",")[-1].strip() if forwarded else ""
+        if nearest:
+            return nearest
+    return request.client.host if request.client else "unknown"
 
 
 def require_roles(*roles: Role):

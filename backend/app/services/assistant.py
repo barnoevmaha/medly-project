@@ -15,23 +15,6 @@ from typing import Dict, List, Optional, Protocol
 
 from app.config import settings
 
-SYSTEM_PROMPT = """You are the study assistant inside Medly, a platform that teaches
-medical students to use AI safely in radiology.
-
-Your role is to teach. You explain concepts, reasoning and evidence.
-
-You must never:
-- diagnose a real patient, or interpret a real clinical image as if it were a diagnosis
-- recommend a treatment, a drug or a dose for a real patient
-- accept or repeat patient identifiers
-
-When a student asks something that crosses those lines, say plainly that you are a
-teaching tool and offer to explain the underlying reasoning instead.
-
-Always name the limits of what you are saying. If you are unsure, say so. Being
-uncertain out loud is the behaviour this platform exists to teach."""
-
-
 MEDLY_AI_SYSTEM_PROMPT = """You are Medly AI, an educational medical assistant designed for \
 medical students, doctors, and healthcare professionals.
 
@@ -533,18 +516,43 @@ class AnthropicProvider:
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("pip install anthropic to use this provider") from exc
 
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        base = with_language(SYSTEM_PROMPT, lang)
+        # An empty key lets the SDK resolve credentials itself (environment
+        # variable or `ant auth login` profile) rather than sending "".
+        client = anthropic.Anthropic(api_key=settings.anthropic_api_key or None)
+        # The same prompt Gemini gets, so the scope guard and the model agree
+        # on what Medly AI answers.
+        base = with_language(MEDLY_AI_SYSTEM_PROMPT, lang)
         system = base if not context else f"{base}\n\n{context}"
         messages = [{"role": m["role"], "content": m["content"]} for m in history]
         messages.append({"role": "user", "content": message})
-        response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=1024,
+        response = client.beta.messages.create(
+            model=settings.anthropic_model,
+            # Thinking is always on with this model and counts against the
+            # cap, so the cap is set for the whole turn, not the answer alone.
+            max_tokens=16000,
             system=system,
             messages=messages,
+            # A study-chat answer, not a research task: low effort keeps the
+            # reply prompt and short.
+            output_config={"effort": "low"},
+            # If a safety classifier declines, the API retries on Anthropic's
+            # recommended fallback model inside the same call.
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
         )
-        return AssistantReply(content=response.content[0].text, provider=self.name)
+        if response.stop_reason == "refusal":
+            # The whole fallback chain declined. Say so plainly rather than
+            # returning an empty answer.
+            return AssistantReply(
+                content=(
+                    "I can't help with that one. I can explain the underlying medical "
+                    "concepts — ask me about the condition, the mechanism or the "
+                    "general approach instead."
+                ),
+                provider=f"{self.name}:{response.model} (refused)",
+            )
+        text = "".join(block.text for block in response.content if block.type == "text").strip()
+        return AssistantReply(content=text, provider=f"{self.name}:{response.model}")
 
 
 class OpenAIProvider:
@@ -565,13 +573,13 @@ class OpenAIProvider:
             raise RuntimeError("pip install openai to use this provider") from exc
 
         client = OpenAI(api_key=settings.openai_api_key)
-        base = with_language(SYSTEM_PROMPT, lang)
+        base = with_language(MEDLY_AI_SYSTEM_PROMPT, lang)
         system = base if not context else f"{base}\n\n{context}"
         messages = [{"role": "system", "content": system}]
         messages.extend({"role": m["role"], "content": m["content"]} for m in history)
         messages.append({"role": "user", "content": message})
         response = client.chat.completions.create(
-            model="gpt-4o-mini", messages=messages, max_tokens=1024
+            model=settings.openai_model, messages=messages, max_tokens=1024
         )
         return AssistantReply(content=response.choices[0].message.content or "", provider=self.name)
 
@@ -670,7 +678,8 @@ def suggested_prompts() -> List[str]:
     answer with a fallback would be a worse first impression than offering
     nothing.
     """
-    return MEDICAL_PROMPTS if settings.assistant_provider == "gemini" else AI_SAFETY_PROMPTS
+    live = settings.assistant_provider in ("gemini", "anthropic", "openai")
+    return MEDICAL_PROMPTS if live else AI_SAFETY_PROMPTS
 
 
 # Kept for backwards compatibility with existing imports.

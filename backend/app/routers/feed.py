@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import Session, func, or_, select
 
-from app.db import get_session
+from app.db import get_session, insert_once
 from app.lang import get_lang
 from app.models.social import Article, ArticleComment, ArticleLike, SavedItem
 from app.models.enums import Role
@@ -293,9 +293,9 @@ def toggle_like(
     ).first()
     if existing:
         session.delete(existing)
+        session.commit()
     else:
-        session.add(ArticleLike(article_id=article.id or 0, user_id=user.id or 0))
-    session.commit()
+        insert_once(session, ArticleLike(article_id=article.id or 0, user_id=user.id or 0))
 
     return _to_out(session, article, user.id or 0, _saved_slugs(session, user.id or 0), lang)
 

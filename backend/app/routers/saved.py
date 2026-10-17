@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, func, or_, select
 
-from app.db import get_session
+from app.db import get_session, insert_once
 from app.lang import get_lang
 from app.models.enums import Role
 from app.models.social import Article, BookProgress, Resource, SavedItem
@@ -232,13 +232,20 @@ def update_book_progress(
             BookProgress.resource_id == resource.id,
         )
     ).first()
-    if row is None:
-        row = BookProgress(user_id=user.id or 0, resource_id=resource.id or 0, percent=percent)
-        session.add(row)
-    else:
-        row.percent = percent
-        row.updated_at = datetime.now(timezone.utc)
-        session.add(row)
+    if row is None and insert_once(
+        session, BookProgress(user_id=user.id or 0, resource_id=resource.id or 0, percent=percent)
+    ):
+        return {"slug": slug, "percent": percent}
+    # Existing row — or one a concurrent request created a moment ago.
+    row = row or session.exec(
+        select(BookProgress).where(
+            BookProgress.user_id == user.id,
+            BookProgress.resource_id == resource.id,
+        )
+    ).one()
+    row.percent = percent
+    row.updated_at = datetime.now(timezone.utc)
+    session.add(row)
     session.commit()
     return {"slug": slug, "percent": percent}
 
@@ -357,15 +364,10 @@ def save_item(
             SavedItem.item_key == payload.item_key,
         )
     ).first()
-    if not existing:
-        existing = SavedItem(
-            user_id=user.id or 0,
-            item_type=payload.item_type,
-            item_key=payload.item_key,
-        )
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
+    if not existing and insert_once(
+        session,
+        SavedItem(user_id=user.id or 0, item_type=payload.item_type, item_key=payload.item_key),
+    ):
         gamification.sync_badges(session, user)
 
     entry = next(

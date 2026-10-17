@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 from app.models._time import UTCDateTime, utcnow
@@ -37,6 +38,8 @@ class Community(SQLModel, table=True):
 
 class CommunityMember(SQLModel, table=True):
     __tablename__ = "community_members"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_community_members_community_user", "community_id", "user_id", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     community_id: int = Field(foreign_key="communities.id", index=True)

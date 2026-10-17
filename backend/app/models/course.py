@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 from app.models._time import UTCDateTime, utcnow
@@ -57,6 +58,8 @@ class Lesson(SQLModel, table=True):
 
 class Enrollment(SQLModel, table=True):
     __tablename__ = "enrollments"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_enrollments_user_course", "user_id", "course_id", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -67,6 +70,8 @@ class Enrollment(SQLModel, table=True):
 
 class LessonProgress(SQLModel, table=True):
     __tablename__ = "lesson_progress"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_lesson_progress_user_lesson", "user_id", "lesson_id", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)

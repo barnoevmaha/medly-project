@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import Session, select
@@ -282,7 +282,6 @@ def suggestions() -> List[str]:
 @router.post("/chat", response_model=ChatResponse)
 def chat(
     payload: ChatRequest,
-    response: Response,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
     lang: str = Depends(get_lang),
@@ -409,13 +408,16 @@ def chat(
     try:
         verdict_rate = _limiter.check(key)
         if not verdict_rate.allowed:
-            response.headers["Retry-After"] = str(verdict_rate.retry_after_seconds)
+            # On the exception, not on `response`: FastAPI builds a fresh
+            # response for an HTTPException, so a header set on the injected
+            # one never reaches the client.
             raise HTTPException(
                 status_code=429,
                 detail=(
                     "You have reached the Medly AI limit for now. "
                     f"Try again in {verdict_rate.retry_after_seconds} seconds."
                 ),
+                headers={"Retry-After": str(verdict_rate.retry_after_seconds)},
             )
 
         provider = get_provider()
@@ -620,7 +622,6 @@ def _persist_answer(
 @router.post("/chat/stream")
 def chat_stream(
     payload: ChatRequest,
-    response: Response,
     session: Session = Depends(get_session),
     user: User = Depends(get_current_user),
     lang: str = Depends(get_lang),
@@ -779,13 +780,13 @@ def chat_stream(
     rate = _limiter.check(limit_key)
     if not rate.allowed:
         _in_flight.release(limit_key)
-        response.headers["Retry-After"] = str(rate.retry_after_seconds)
         raise HTTPException(
             status_code=429,
             detail=(
                 "You have reached the Medly AI limit for now. "
                 f"Try again in {rate.retry_after_seconds} seconds."
             ),
+            headers={"Retry-After": str(rate.retry_after_seconds)},
         )
 
     # Everything the generator needs, captured as plain values while the

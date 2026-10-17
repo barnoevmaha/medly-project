@@ -260,63 +260,67 @@ def generate_stream(
     )
     mark("request sent")
 
-    with httpx.Client(timeout=settings.gemini_timeout_seconds) as client:
-        with client.stream("POST", url, json=body, headers=headers) as response:
-            if response.status_code >= 400:
-                response.read()
-                _raise_for_status(response.status_code, response.text)
+    try:
+        with httpx.Client(timeout=settings.gemini_timeout_seconds) as client:
+            with client.stream("POST", url, json=body, headers=headers) as response:
+                if response.status_code >= 400:
+                    response.read()
+                    _raise_for_status(response.status_code, response.text)
 
-            mark("upstream headers", f"status={response.status_code}")
-            for line in response.iter_lines():
-                if not line or not line.startswith("data:"):
-                    continue
-                payload_text = line[5:].strip()
-                if not payload_text or payload_text == "[DONE]":
-                    continue
-                try:
-                    payload = json.loads(payload_text)
-                except ValueError:
-                    # A malformed frame is skipped rather than killing a stream
-                    # the user is already reading.
-                    logger.warning("gemini stream: unparseable frame, skipped")
-                    continue
+                mark("upstream headers", f"status={response.status_code}")
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    payload_text = line[5:].strip()
+                    if not payload_text or payload_text == "[DONE]":
+                        continue
+                    try:
+                        payload = json.loads(payload_text)
+                    except ValueError:
+                        # A malformed frame is skipped rather than killing a stream
+                        # the user is already reading.
+                        logger.warning("gemini stream: unparseable frame, skipped")
+                        continue
 
-                blocked = (payload.get("promptFeedback") or {}).get("blockReason")
-                if blocked and not produced:
-                    raise GeminiBadResponse(
-                        f"gemini blocked the prompt: {blocked}",
-                        user_message=(
-                            "Medly AI could not answer that. Try rewording it as an "
-                            "educational question."
-                        ),
-                    )
+                    blocked = (payload.get("promptFeedback") or {}).get("blockReason")
+                    if blocked and not produced:
+                        raise GeminiBadResponse(
+                            f"gemini blocked the prompt: {blocked}",
+                            user_message=(
+                                "Medly AI could not answer that. Try rewording it as an "
+                                "educational question."
+                            ),
+                        )
 
-                for candidate in payload.get("candidates") or []:
-                    parts = ((candidate.get("content") or {}).get("parts")) or []
-                    for part in parts:
-                        text = part.get("text")
-                        if text:
-                            now = time.monotonic()
-                            produced += len(text)
-                            fragments += 1
-                            if first_at is None:
-                                first_at = now
-                                mark(
-                                    "FIRST chunk received",
-                                    f"chars={len(text)} (time to first token)",
-                                )
-                            else:
-                                gap = now - (last_at or now)
-                                gaps.append(gap)
-                                mark(
-                                    "chunk received",
-                                    f"n={fragments} chars={len(text)} "
-                                    f"gap={gap * 1000:.0f}ms total={produced}",
-                                )
-                            last_at = now
-                            yield text
-
-    latency_ms = int((time.monotonic() - started) * 1000)
+                    for candidate in payload.get("candidates") or []:
+                        parts = ((candidate.get("content") or {}).get("parts")) or []
+                        for part in parts:
+                            text = part.get("text")
+                            if text:
+                                now = time.monotonic()
+                                produced += len(text)
+                                fragments += 1
+                                if first_at is None:
+                                    first_at = now
+                                    mark(
+                                        "FIRST chunk received",
+                                        f"chars={len(text)} (time to first token)",
+                                    )
+                                else:
+                                    gap = now - (last_at or now)
+                                    gaps.append(gap)
+                                    mark(
+                                        "chunk received",
+                                        f"n={fragments} chars={len(text)} "
+                                        f"gap={gap * 1000:.0f}ms total={produced}",
+                                    )
+                                last_at = now
+                                yield text
+    except (httpx.TimeoutException, httpx.TransportError) as exc:
+        # The same classification `generate()` gives a network failure, so the
+        # router can fall back to the offline engine when nothing has been
+        # shown yet — instead of reporting a crash.
+        raise GeminiUnavailable(f"gemini stream network error: {exc}") from exc
 
     # One line that answers "did Gemini stream, or did it batch?" without
     # anyone having to read a wall of per-chunk lines.

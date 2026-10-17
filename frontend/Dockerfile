@@ -26,6 +26,7 @@ RUN chmod +x /docker-entrypoint.d/40-medly-config.sh /docker-entrypoint.d/18-med
 # proxy above. Set it only to bypass the proxy and call an API elsewhere.
 ENV PORT=80 \
     MEDLY_API_URL="" \
-    MEDLY_API_UPSTREAM=""
+    MEDLY_API_UPSTREAM="" \
+    MEDLY_PROXY_SECRET=""
 
 EXPOSE 80

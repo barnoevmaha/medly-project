@@ -17,6 +17,7 @@ from app.db import get_session
 from app.models.enums import Role
 from app.models.user import User
 from app.security import (
+    client_ip,
     create_access_token,
     find_user_by_email,
     get_current_user,
@@ -94,12 +95,6 @@ _email_limiter = SlidingWindowLimiter(
 )
 
 
-def _client_ip(request: Request) -> str:
-    # Behind a proxy this is only the real client when uvicorn trusts the
-    # forwarded headers — the Dockerfile starts it with --forwarded-allow-ips.
-    return request.client.host if request.client else "unknown"
-
-
 def _enforce_rate_limit(request: Request, email: str) -> None:
     """429 once either this IP or this address has made too many attempts.
 
@@ -108,7 +103,7 @@ def _enforce_rate_limit(request: Request, email: str) -> None:
     person signs in five times a minute.
     """
     for limiter, key in (
-        (_ip_limiter, f"ip:{_client_ip(request)}"),
+        (_ip_limiter, f"ip:{client_ip(request)}"),
         (_email_limiter, f"email:{email}"),
     ):
         verdict = limiter.check(key)

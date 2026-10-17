@@ -115,6 +115,12 @@ class Settings:
 
     database_url: str = os.getenv("MEDLY_DATABASE_URL", "sqlite:///./medly.db")
 
+    # Shared with the web service's nginx, which proxies /api/ here and vouches
+    # for the browser's address in X-Medly-Client-IP. Only a request carrying
+    # this secret is believed; see `client_ip` in app/security.py. Empty keeps
+    # the platform's forwarded address as the only source.
+    proxy_secret: str = os.getenv("MEDLY_PROXY_SECRET", "")
+
     # Exactly the origins listed, nothing matched by pattern. A wildcard such
     # as `https://.*\.vercel\.app` admits every app anyone deploys on that
     # platform, and with credentials allowed that is every one of them able to
@@ -137,9 +143,17 @@ class Settings:
     # because that would invalidate every stored session on restart.
     seed_on_startup: bool = _flag("MEDLY_SEED_ON_STARTUP")
 
+    # Swagger UI and the OpenAPI schema list every endpoint and every field.
+    # Handy on a laptop; outside dev they stay off unless asked for.
+    api_docs: bool = _IS_DEV or _flag("MEDLY_API_DOCS")
+
     assistant_provider: str = os.getenv("MEDLY_ASSISTANT_PROVIDER", "rules")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    # MEDLY_ASSISTANT_PROVIDER=anthropic. Claude Opus 5.5 by default; set
+    # claude-sonnet-5-5 here for a cheaper model on the same request shape.
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     # --- Gemini ------------------------------------------------------------
     # Server-side only. The key is never sent to the browser: the frontend
@@ -262,6 +276,11 @@ def validate_settings(config: Settings) -> None:
         problems.append(
             f"MEDLY_SECRET_KEY is {len(config.secret_key)} characters; "
             f"at least {MIN_SECRET_KEY_LENGTH} are required."
+        )
+    if config.proxy_secret and len(config.proxy_secret) < MIN_SECRET_KEY_LENGTH:
+        problems.append(
+            f"MEDLY_PROXY_SECRET is {len(config.proxy_secret)} characters; "
+            f"at least {MIN_SECRET_KEY_LENGTH} are required (or leave it unset)."
         )
     if "*" in config.cors_origins:
         problems.append(

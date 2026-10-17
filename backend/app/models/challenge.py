@@ -90,6 +90,8 @@ class ChallengeChoice(SQLModel, table=True):
 
 class ChallengeParticipant(SQLModel, table=True):
     __tablename__ = "challenge_participants"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_challenge_participants_challenge_user", "challenge_id", "user_id", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     challenge_id: int = Field(foreign_key="challenges.id", index=True)

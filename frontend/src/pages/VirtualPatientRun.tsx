@@ -112,8 +112,13 @@ export default function VirtualPatientRun() {
       setVerdict(null);
       setSelected(null);
       setError(null);
-      // A finished run goes straight to its result rather than replaying.
-      if (current.status !== "in_progress") {
+      // A finished run goes straight to its result rather than replaying. An
+      // abandoned one has no result to show: the server keeps its debrief,
+      // which would give away the answers, to runs that were played out.
+      if (current.status === "abandoned") {
+        setResult(null);
+        setError(t("virtualPatient.sessionGone"));
+      } else if (current.status !== "in_progress") {
         setResult(await api.vpResult(current.session_id));
       } else {
         setResult(null);

@@ -24,4 +24,10 @@ esac
 # passing the path through, so every request would 404.
 MEDLY_API_UPSTREAM="${MEDLY_API_UPSTREAM%/}"
 export MEDLY_API_UPSTREAM
+
+# Defined even when unset, or the template renderer would leave the literal
+# "${MEDLY_API_UPSTREAM}"-style placeholder in nginx.conf. Empty is supported:
+# nginx then sends no secret, and the API falls back to the forwarded address.
+MEDLY_PROXY_SECRET="${MEDLY_PROXY_SECRET:-}"
+export MEDLY_PROXY_SECRET
 echo "medly: proxying /api/ to $MEDLY_API_UPSTREAM"

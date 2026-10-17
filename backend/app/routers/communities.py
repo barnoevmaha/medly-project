@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import Session, and_, func, or_, select
 
-from app.db import get_session
+from app.db import get_session, insert_once
 from app.lang import get_lang
 from app.models.community import Community, CommunityMember, CommunityMessage
 from app.models.enums import Role
@@ -279,9 +279,9 @@ def join(
             CommunityMember.user_id == user.id,
         )
     ).first()
-    if not existing:
-        session.add(CommunityMember(community_id=community.id or 0, user_id=user.id or 0))
-        session.commit()
+    if not existing and insert_once(
+        session, CommunityMember(community_id=community.id or 0, user_id=user.id or 0)
+    ):
         gamification.sync_badges(session, user)
     return _to_out(session, community, user, _joined_ids(session, user.id or 0), lang)
 
@@ -386,8 +386,7 @@ def post_message(
         )
     ).first()
     if not joined:
-        session.add(CommunityMember(community_id=community.id or 0, user_id=user.id or 0))
-        session.commit()
+        insert_once(session, CommunityMember(community_id=community.id or 0, user_id=user.id or 0))
 
     body = payload.body.strip()
     if not body:

@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select
 
-from app.db import get_session
+from app.db import get_session, insert_once
 from app.lang import get_lang
 from app.models.badge import UserBadge
 from app.models.challenge import (
@@ -305,10 +305,7 @@ def join(
         )
     ).first()
     if not existing:
-        session.add(
-            ChallengeParticipant(challenge_id=challenge.id or 0, user_id=user.id or 0)
-        )
-        session.commit()
+        insert_once(session, ChallengeParticipant(challenge_id=challenge.id or 0, user_id=user.id or 0))
     return get_challenge(slug, session=session, user=user, lang=lang)
 
 
@@ -413,10 +410,9 @@ def answer(
             )
         ).first()
         if not participant:
-            session.add(
-                ChallengeParticipant(challenge_id=challenge.id or 0, user_id=user.id or 0)
+            insert_once(
+                session, ChallengeParticipant(challenge_id=challenge.id or 0, user_id=user.id or 0)
             )
-            session.commit()
 
         gamification.touch_streak(session, user)
         if awarded:

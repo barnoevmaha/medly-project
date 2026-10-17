@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from app.db import get_session
+from app.db import get_session, insert_once
 from app.lang import get_lang
 from app.models.course import Course, Enrollment, Lesson, LessonProgress
 from app.models.enums import EventType, LessonKind, ProgressStatus
@@ -65,6 +65,14 @@ def _progress_map(session: Session, user_id: int, lesson_ids: List[int]) -> dict
     return {row.lesson_id: row.status for row in rows}
 
 
+def _lesson_progress(session: Session, user_id: int, lesson_id: int) -> LessonProgress:
+    return session.exec(
+        select(LessonProgress).where(
+            LessonProgress.user_id == user_id, LessonProgress.lesson_id == lesson_id
+        )
+    ).one()
+
+
 @router.get("/lessons/{lesson_id}", response_model=LessonDetail)
 def get_lesson(
     lesson_id: int,
@@ -86,12 +94,12 @@ def get_lesson(
         )
     ).first()
     if not progress:
-        progress = LessonProgress(
-            user_id=user.id or 0, lesson_id=lesson_id, status=ProgressStatus.IN_PROGRESS
+        insert_once(
+            session,
+            LessonProgress(user_id=user.id or 0, lesson_id=lesson_id, status=ProgressStatus.IN_PROGRESS),
         )
-        session.add(progress)
-        session.commit()
-        session.refresh(progress)
+        # Ours, or the one a concurrent open of the same lesson wrote.
+        progress = _lesson_progress(session, user.id or 0, lesson_id)
 
     return LessonDetail(
         id=lesson.id or 0,
@@ -123,8 +131,8 @@ def complete_lesson(
         )
     ).first()
     if not progress:
-        progress = LessonProgress(user_id=user.id or 0, lesson_id=lesson_id)
-        session.add(progress)
+        insert_once(session, LessonProgress(user_id=user.id or 0, lesson_id=lesson_id))
+        progress = _lesson_progress(session, user.id or 0, lesson_id)
 
     progress.status = ProgressStatus.COMPLETED
     progress.completed_at = datetime.now(timezone.utc)
@@ -263,8 +271,7 @@ def enroll(
         select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course.id)
     ).first()
     if not existing:
-        session.add(Enrollment(user_id=user.id or 0, course_id=course.id or 0))
-        session.commit()
+        insert_once(session, Enrollment(user_id=user.id or 0, course_id=course.id or 0))
 
     lessons = session.exec(select(Lesson).where(Lesson.course_id == course.id)).all()
     return CourseSummary(

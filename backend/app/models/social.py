@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 from app.models._time import UTCDateTime, utcnow
@@ -89,6 +90,8 @@ class ArticleLike(SQLModel, table=True):
     """One row per (user, article). The uniqueness is enforced in the router."""
 
     __tablename__ = "article_likes"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_article_likes_user_article", "user_id", "article_id", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     article_id: int = Field(foreign_key="articles.id", index=True)
@@ -153,6 +156,8 @@ class BookProgress(SQLModel, table=True):
     """
 
     __tablename__ = "book_progress"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_book_progress_user_resource", "user_id", "resource_id", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
@@ -169,6 +174,8 @@ class SavedItem(SQLModel, table=True):
     """
 
     __tablename__ = "saved_items"
+    # One row per pair, as a database rule (see app/db.py `_ensure_unique_indexes`).
+    __table_args__ = (Index("ux_saved_items_user_item", "user_id", "item_type", "item_key", unique=True),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)

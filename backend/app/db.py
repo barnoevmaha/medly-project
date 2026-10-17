@@ -254,6 +254,25 @@ def init_db() -> None:
     migrate_columns()
 
 
+def insert_once(session: Session, row: Any) -> bool:
+    """Insert `row`, or report False if a unique index says it already exists.
+
+    For the "check, then insert" rows — a like, a membership, a badge. The
+    check alone lets two requests arriving together both insert; with the
+    unique index the second insert fails, and this turns that failure into
+    the answer the check would have given: it is already there.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    session.add(row)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        return False
+    return True
+
+
 def get_session() -> Iterator[Session]:
     with Session(engine) as session:
         yield session

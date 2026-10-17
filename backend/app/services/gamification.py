@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import update
 from sqlmodel import Session, func, select
 
+from app.db import insert_once
 from app.models.analysis import AnalysisJob
 from app.models.badge import UserBadge
 from app.models.community import CommunityMember
@@ -163,9 +164,14 @@ def sync_badges(session: Session, user: User) -> List[str]:
     }
     for key in earned_keys(session, user):
         if key not in held:
-            session.add(UserBadge(user_id=user.id or 0, badge_key=key,
-                                  earned_at=datetime.now(timezone.utc)))
+            # One at a time, so a badge a concurrent request already awarded
+            # (unique per user and key) does not undo the others.
+            insert_once(
+                session,
+                UserBadge(user_id=user.id or 0, badge_key=key, earned_at=datetime.now(timezone.utc)),
+            )
             held.add(key)
+    # Callers have long relied on this committing their pending changes too.
     session.commit()
     return [badge["key"] for badge in BADGES if badge["key"] in held]
 

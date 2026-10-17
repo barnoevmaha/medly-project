@@ -40,6 +40,8 @@ EXPOSE 8000
 # --forwarded-allow-ips '*' makes uvicorn take the client address from
 # X-Forwarded-For. Without it every request appears to come from the platform's
 # proxy, and the per-IP login limit becomes one bucket shared by every user.
-# Trusting any sender is right only because the container is reachable solely
-# through that proxy; on a host exposed directly, list the proxy's IPs instead.
+# uvicorn takes the header's *first* entry, which a client can write itself;
+# set MEDLY_PROXY_SECRET (on this service and the web service) and the login
+# limit uses an address the client cannot forge — see client_ip() in
+# app/security.py.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"]

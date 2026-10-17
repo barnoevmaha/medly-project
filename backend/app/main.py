@@ -133,6 +133,11 @@ app = FastAPI(
     ),
     version="1.0.0",
     lifespan=lifespan,
+    # Off outside dev (see `api_docs` in app/config.py): a public map of every
+    # endpoint helps nobody but someone looking for a way in.
+    docs_url="/docs" if settings.api_docs else None,
+    redoc_url="/redoc" if settings.api_docs else None,
+    openapi_url="/openapi.json" if settings.api_docs else None,
 )
 
 app.add_middleware(

@@ -651,6 +651,14 @@ def get_result(
         raise HTTPException(
             status_code=409, detail="This case is still in progress."
         )
+    if run.status == SessionStatus.ABANDONED.value:
+        # The debrief names the diagnosis and every right answer. A run given
+        # up after one click has earned none of that — otherwise "start,
+        # abandon, read the result" is a free answer key for the next attempt.
+        raise HTTPException(
+            status_code=409,
+            detail="This case was abandoned. Start it again to reach a debrief.",
+        )
 
     case = db.get(VirtualPatientCase, run.case_id)
     if not case:

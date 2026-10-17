@@ -41,11 +41,14 @@ class SlidingWindowLimiter:
 
             in_last_minute = sum(1 for hit in hits if now - hit <= 60)
             if in_last_minute >= self.per_minute:
-                oldest_recent = next(hit for hit in hits if now - hit <= 60)
+                # A ceiling of 0 has no recent hit to count down from; it means
+                # "none this minute", so the wait is the whole window.
+                oldest_recent = next((hit for hit in hits if now - hit <= 60), now)
                 return RateVerdict(False, max(1, int(60 - (now - oldest_recent))))
 
             if len(hits) >= self.per_hour:
-                return RateVerdict(False, max(1, int(3600 - (now - hits[0]))))
+                oldest = hits[0] if hits else now
+                return RateVerdict(False, max(1, int(3600 - (now - oldest))))
 
             hits.append(now)
             return RateVerdict(True)

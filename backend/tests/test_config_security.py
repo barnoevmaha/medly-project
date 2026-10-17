@@ -154,3 +154,26 @@ def test_listed_origin_is_allowed_with_credentials(client: TestClient) -> None:
     )
     assert response.headers["access-control-allow-origin"] == origin
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+# ------------------------------------------------------------ API docs
+
+
+def test_api_docs_are_off_outside_dev() -> None:
+    out = _settings_in_subprocess(
+        {"MEDLY_ENV": "production", "MEDLY_SECRET_KEY": STRONG_KEY},
+        "__import__('app.main', fromlist=['app']).app.openapi_url",
+    )
+    assert out == "None"
+
+
+def test_api_docs_can_be_turned_on_outside_dev() -> None:
+    out = _settings_in_subprocess(
+        {"MEDLY_ENV": "production", "MEDLY_SECRET_KEY": STRONG_KEY, "MEDLY_API_DOCS": "true"},
+        "__import__('app.main', fromlist=['app']).app.openapi_url",
+    )
+    assert out == "/openapi.json"
+
+
+def test_api_docs_are_on_in_dev(client: TestClient) -> None:
+    assert client.get("/openapi.json").status_code == 200

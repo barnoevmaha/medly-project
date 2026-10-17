@@ -30,4 +30,11 @@ export MEDLY_API_UPSTREAM
 # nginx then sends no secret, and the API falls back to the forwarded address.
 MEDLY_PROXY_SECRET="${MEDLY_PROXY_SECRET:-}"
 export MEDLY_PROXY_SECRET
+
+# "true" when a platform proxy sits in front of this container and appends the
+# real client address to X-Forwarded-For (Railway, Render, Fly). "false" when
+# browsers connect directly (docker compose), where that header is whatever
+# the client wrote. Anything but "true" counts as false.
+MEDLY_TRUST_FORWARDED="${MEDLY_TRUST_FORWARDED:-true}"
+export MEDLY_TRUST_FORWARDED
 echo "medly: proxying /api/ to $MEDLY_API_UPSTREAM"

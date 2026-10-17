@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, SkeletonCard } from "@/components/ui/states";
 import { useLanguage } from "@/lib/i18n";
 import { api, type ArticleSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useLatestGuard } from "@/lib/latest";
 
 /* Filter values stay in English — they are the exact `tag` the API filters
    and searches on — and are only translated for display, via FILTER_LABEL. */
@@ -96,18 +97,26 @@ export function ArticleFeed({
   const debounce = useRef<number>();
   const touched = useRef(false);
 
+  const begin = useLatestGuard();
+
   const load = useCallback(async (nextQuery: string, nextFilter: string) => {
+    const isCurrent = begin();
     setSearching(true);
     try {
-      setArticles(await api.articles({ q: nextQuery, tag: nextFilter }));
+      const found = await api.articles({ q: nextQuery, tag: nextFilter });
+      if (!isCurrent()) return; // a newer search has started since
+      setArticles(found);
       setError(null);
     } catch (e) {
+      if (!isCurrent()) return;
       setError(e instanceof Error ? e.message : t("feed.loadError"));
     } finally {
-      setSearching(false);
-      setLoading(false);
+      if (isCurrent()) {
+        setSearching(false);
+        setLoading(false);
+      }
     }
-  }, [t]);
+  }, [t, begin]);
 
   useEffect(() => {
     void load("", "All");

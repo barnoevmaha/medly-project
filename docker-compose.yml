@@ -44,6 +44,9 @@ services:
       # nginx proxies /api/ here, so the browser talks to one origin — the
       # same setup as on Railway.
       MEDLY_API_UPSTREAM: http://api:8000
+      # Browsers reach this container directly, with no platform proxy adding
+      # their address to X-Forwarded-For, so that header proves nothing here.
+      MEDLY_TRUST_FORWARDED: "false"
     depends_on:
       api:
         condition: service_healthy

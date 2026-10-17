@@ -17,6 +17,7 @@ import { EmptyState, ErrorState, SkeletonCard } from "@/components/ui/states";
 import { useLanguage } from "@/lib/i18n";
 import { ApiError, api, type CommunityPermissions, type CommunitySummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useLatestGuard } from "@/lib/latest";
 
 export default function Community() {
   const navigate = useNavigate();
@@ -43,14 +44,19 @@ export default function Community() {
   const touched = useRef(false);
 
   // Search is scoped server-side to the name and the description under it.
+  const begin = useLatestGuard();
   const load = useCallback(async (nextQuery: string, nextFilter: string) => {
+    const isCurrent = begin();
     try {
-      setCommunities(await api.communities({ q: nextQuery, filter: nextFilter }));
+      const found = await api.communities({ q: nextQuery, filter: nextFilter });
+      if (!isCurrent()) return; // a newer search has started since
+      setCommunities(found);
       setError(null);
     } catch (e) {
+      if (!isCurrent()) return;
       setError(e instanceof Error ? e.message : t("communities.loadError"));
     }
-  }, [t]);
+  }, [t, begin]);
 
   useEffect(() => {
     Promise.all([api.communities(), api.communityPermissions()])

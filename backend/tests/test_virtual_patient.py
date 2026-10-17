@@ -356,3 +356,15 @@ def test_a_whole_case_is_playable_with_gemini_down(
     assert final["outcome"] == "good"
     # Authored patient line survived the outage.
     assert final["next_stage"]["narrated"] is False
+
+
+def test_an_abandoned_run_has_no_debrief(
+    client: TestClient, student_headers: dict, no_gemini
+) -> None:
+    """Otherwise "start, abandon, read the result" hands out the diagnosis and
+    every right answer before the case has been played."""
+    sid = fresh_start(client, student_headers)["session_id"]
+    client.post(f"/api/virtual-patient/sessions/{sid}/abandon", headers=student_headers)
+    response = client.get(f"/api/virtual-patient/sessions/{sid}/result", headers=student_headers)
+    assert response.status_code == 409
+    assert "Community-acquired pneumonia" not in response.text

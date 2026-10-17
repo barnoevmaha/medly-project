@@ -65,6 +65,7 @@ staged — the database contains password hashes.
    | `MEDLY_SEED_ON_STARTUP` | `true` |
    | `MEDLY_DATABASE_URL` | `sqlite:////app/data/medly.db` |
    | `MEDLY_SEED_DEMO_USERS` | `true` only for a public demo that needs the demo accounts |
+   | `MEDLY_PROXY_SECRET` | a second random string, at least 32 characters — the **same** value on the web service |
 
    The API refuses to start outside `MEDLY_ENV=dev` while `MEDLY_SECRET_KEY` is
    missing, the built-in default, or shorter than 32 characters — the deploy
@@ -131,6 +132,11 @@ demo accounts. If it is missing, the seed did not run and nobody can sign in.
    every 15 minutes. Through the proxy the cookie is first-party everywhere.
 
    Leave `MEDLY_API_URL` unset. It exists only to bypass the proxy.
+
+   Also set `MEDLY_PROXY_SECRET` here, to the same value as on the API. nginx
+   then vouches for each browser's address, so the API's per-IP login limit
+   counts real users and cannot be dodged by a forged `X-Forwarded-For`.
+   Without it everything still works; that limit is just easier to get round.
 4. **Settings → Networking → Generate Domain.**
 
 ---

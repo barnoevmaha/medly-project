@@ -38,6 +38,10 @@ PyMySQL==1.2.3
 
 httpx==0.28.1
 
+# Medly AI on Claude (MEDLY_ASSISTANT_PROVIDER=anthropic). Installed so that
+# switching provider is a variable change, not a rebuild.
+anthropic==1.11.0
+
 # Medly AI (MEDLY_ASSISTANT_PROVIDER=gemini) needs no extra package. It calls
 # the documented Gemini REST endpoint with httpx, already listed above — one
 # less dependency to install, pin and keep current, and the request shape is
@@ -46,7 +50,6 @@ httpx==0.28.1
 # Optional, deliberately not installed. Imported lazily inside the provider
 # that needs them, so the default path stays dependency-free and a missing
 # package is a clear runtime message rather than a failed deploy.
-#   anthropic     for MEDLY_ASSISTANT_PROVIDER=anthropic
 #   openai        for MEDLY_ASSISTANT_PROVIDER=openai
 
 # --- transitive dependencies (pinned so every install resolves the same tree) ---
@@ -57,20 +60,26 @@ anyio==4.15.1
 certifi==2026.7.22
 click==8.5.0
 dnspython==2.9.0
+docstring_parser==0.18.0
 email-validator==2.3.0
 h11==0.16.0
 httpcore==1.0.9
+httpcore2==2.13.1
 httptools==0.9.0
+httpx2==2.13.1
 idna==3.20
+jiter==0.17.0
 opentelemetry-api==1.45.1
 psycopg-binary==3.3.6
 pydantic_core==2.50.1
 python-dotenv==1.2.4
 PyYAML==6.0.3
+sniffio==1.3.1
 SQLAlchemy==2.1.4
 starlette==1.7.0
-typing-inspection==0.4.4
+truststore==0.10.4
 typing_extensions==4.16.0
+typing-inspection==0.4.4
 # uvicorn only asks for uvloop off Windows; an unconditional pin would make
 # `pip install` fail there.
 uvloop==0.23.0; sys_platform != "win32" and sys_platform != "cygwin" and platform_python_implementation != "PyPy"

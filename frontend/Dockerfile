@@ -11,6 +11,10 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
+# Files keep the permissions they had on the machine that sent the build
+# context. `railway up` uploads straight from a laptop, where an asset saved
+# as 600 is unreadable by the nginx worker and served as 403 — the logo was.
+RUN chmod -R a+rX /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # The API URL is written at container start rather than baked in at build time,

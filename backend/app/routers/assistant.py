@@ -507,7 +507,8 @@ def chat(
         disclaimer=settings.disclaimer,
         provider=result.provider,
         audit_event_id=event.id,
-        model=settings.gemini_model if result.provider.startswith("gemini") else None,
+        # "gemini:<model>" or "anthropic:<model>"; the offline engine has none.
+        model=result.provider.split(":", 1)[1].split(" ", 1)[0] if ":" in result.provider else None,
         notice=notice,
     )
 
@@ -799,7 +800,8 @@ def chat_stream(
         collected: List[str] = []
         interrupted = False
         started = time.monotonic()
-        provider_name = f"gemini:{settings.gemini_model}"
+        model = getattr(provider, "model", None)
+        provider_name = f"{provider.name}:{model}" if model else provider.name
         frames = 0
         first_frame_at: Optional[float] = None
 
@@ -844,7 +846,7 @@ def chat_stream(
                     "blocked": False,
                     "risk_level": risk_level.value,
                     "disclaimer": settings.disclaimer,
-                    "model": settings.gemini_model,
+                    "model": model,
                     "interrupted": False,
                 },
             )

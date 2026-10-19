@@ -18,6 +18,8 @@ from app.services.assistant import AssistantReply
 
 
 class Spy:
+    name = "spy"
+
     def __init__(self) -> None:
         self.calls: list[dict] = []
 

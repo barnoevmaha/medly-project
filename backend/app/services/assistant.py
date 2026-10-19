@@ -504,13 +504,25 @@ class AnthropicProvider:
 
     name = "anthropic"
 
-    def reply(
+    # Said when the whole fallback chain declines, rather than an empty answer.
+    REFUSAL = (
+        "I can't help with that one. I can explain the underlying medical "
+        "concepts — ask me about the condition, the mechanism or the "
+        "general approach instead."
+    )
+
+    @property
+    def model(self) -> str:
+        return settings.anthropic_model
+
+    def _request(
         self,
         message: str,
         history: List[Dict[str, str]],
-        context: Optional[str] = None,
-        lang: str = "en",
-    ) -> AssistantReply:
+        context: Optional[str],
+        lang: str,
+    ):
+        """The client and the arguments shared by `reply` and `stream`."""
         try:
             import anthropic  # imported lazily so the default path needs no dependency
         except ImportError as exc:  # pragma: no cover
@@ -525,34 +537,95 @@ class AnthropicProvider:
         system = base if not context else f"{base}\n\n{context}"
         messages = [{"role": m["role"], "content": m["content"]} for m in history]
         messages.append({"role": "user", "content": message})
-        response = client.beta.messages.create(
-            model=settings.anthropic_model,
+        kwargs = {
+            "model": settings.anthropic_model,
             # Thinking is always on with this model and counts against the
             # cap, so the cap is set for the whole turn, not the answer alone.
-            max_tokens=16000,
-            system=system,
-            messages=messages,
+            "max_tokens": 16000,
+            "system": system,
+            "messages": messages,
             # A study-chat answer, not a research task: low effort keeps the
             # reply prompt and short.
-            output_config={"effort": "low"},
+            "output_config": {"effort": "low"},
             # If a safety classifier declines, the API retries on Anthropic's
-            # recommended fallback model inside the same call.
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        )
+            # recommended fallback model inside the same call (or stream).
+            "betas": ["server-side-fallback-2026-07-01"],
+            "fallbacks": "default",
+        }
+        return anthropic, client, kwargs
+
+    @staticmethod
+    def _translated(anthropic, exc: Exception) -> Exception:
+        """Map an SDK error onto the provider-neutral classes the router acts
+        on: busy or down falls back to the offline engine, a bad key or model
+        is reported as a configuration fault. Anything else is returned as is."""
+        from app.services import gemini
+
+        detail = f"anthropic: {type(exc).__name__}: {exc}"
+        if isinstance(exc, anthropic.RateLimitError):
+            return gemini.GeminiRateLimited(detail)
+        if isinstance(
+            exc,
+            (
+                anthropic.OverloadedError,
+                anthropic.ServiceUnavailableError,
+                anthropic.InternalServerError,
+                anthropic.APIConnectionError,  # includes APITimeoutError
+            ),
+        ):
+            return gemini.GeminiUnavailable(detail)
+        if isinstance(
+            exc,
+            (anthropic.AuthenticationError, anthropic.PermissionDeniedError, anthropic.CredentialsError),
+        ):
+            return gemini.GeminiAuthError(detail)
+        if isinstance(exc, anthropic.NotFoundError):
+            return gemini.GeminiModelNotFound(detail)
+        return exc
+
+    def reply(
+        self,
+        message: str,
+        history: List[Dict[str, str]],
+        context: Optional[str] = None,
+        lang: str = "en",
+    ) -> AssistantReply:
+        anthropic, client, kwargs = self._request(message, history, context, lang)
+        try:
+            response = client.beta.messages.create(**kwargs)
+        except anthropic.AnthropicError as exc:
+            raise self._translated(anthropic, exc) from exc
         if response.stop_reason == "refusal":
-            # The whole fallback chain declined. Say so plainly rather than
-            # returning an empty answer.
             return AssistantReply(
-                content=(
-                    "I can't help with that one. I can explain the underlying medical "
-                    "concepts — ask me about the condition, the mechanism or the "
-                    "general approach instead."
-                ),
-                provider=f"{self.name}:{response.model} (refused)",
+                content=self.REFUSAL, provider=f"{self.name}:{response.model} (refused)"
             )
         text = "".join(block.text for block in response.content if block.type == "text").strip()
         return AssistantReply(content=text, provider=f"{self.name}:{response.model}")
+
+    def stream(
+        self,
+        message: str,
+        history: List[Dict[str, str]],
+        context: Optional[str] = None,
+        lang: str = "en",
+    ):
+        """Yield text fragments as they arrive. A fallback after a refusal
+        continues on the same stream, so already-sent text stays valid."""
+        anthropic, client, kwargs = self._request(message, history, context, lang)
+        sent = False
+        try:
+            with client.beta.messages.stream(**kwargs) as stream:
+                for text in stream.text_stream:
+                    if text:
+                        sent = True
+                        yield text
+                final = stream.get_final_message()
+        except anthropic.AnthropicError as exc:
+            raise self._translated(anthropic, exc) from exc
+        if final.stop_reason == "refusal":
+            # The whole chain declined, possibly after some text: end on a
+            # plain explanation rather than stopping mid-sentence in silence.
+            yield ("\n\n" + self.REFUSAL) if sent else self.REFUSAL
 
 
 class OpenAIProvider:
@@ -596,6 +669,10 @@ class GeminiProvider:
     """
 
     name = "gemini"
+
+    @property
+    def model(self) -> str:
+        return settings.gemini_model
 
     def reply(
         self,

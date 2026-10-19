@@ -86,6 +86,9 @@ staged — the database contains password hashes.
    every redeploy, taking the database with it — including any account a judge
    creates while testing.
 
+   Railway mounts the volume owned by root. `docker-entrypoint.sh` hands it to
+   the app's user before dropping root, so no `RAILWAY_RUN_UID` is needed.
+
 5. **Settings → Networking → Generate Domain.** Copy the URL.
 
    **Set the target port to match what the container is listening on.** Railway

@@ -22,9 +22,14 @@ ENV MEDLY_DATABASE_URL=sqlite:////app/data/medly.db \
     MEDLY_SEED_ON_STARTUP=true
 RUN mkdir -p /app/data
 
-# Run as a non-root user; the data directory has to be writable by it.
-RUN useradd --create-home --uid 1000 medly && chown -R medly:medly /app
-USER medly
+# The server runs as a non-root user; the data directory has to be writable by
+# it. There is no `USER medly` here on purpose: a mounted volume arrives owned
+# by root, so the entrypoint starts as root, hands /app/data to medly, and
+# drops privileges before exec-ing the CMD. setpriv ships with util-linux in
+# the base image.
+RUN useradd --create-home --uid 1000 medly && chown -R medly:medly /app \
+    && chmod +x /app/docker-entrypoint.sh && command -v setpriv
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 EXPOSE 8000
 
